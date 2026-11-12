@@ -1,0 +1,64 @@
+# FIXUP Phase 1 architecture
+
+Scope: one Next.js App Router application, Node.js runtime, TypeScript, Tailwind, PostgreSQL and Prisma. No products, prices, checkout, orders, inventory, quotations, payments or delivery modules are implemented.
+
+## Boundaries
+
+- `src/app`: pages and thin HTTP adapters.
+- `src/modules/customers`: validated, owner-scoped profile/address operations.
+- `src/modules/settings`: the owner-only business settings operation.
+- `src/server/auth`: maintained-library authentication, not custom password/session cryptography.
+- `src/server/permissions`: current database role/status evaluation and explicit permissions.
+- `src/server/audit`: allowlisted events; no arbitrary payload logging.
+- `src/server/db`: one pooled Prisma client per Node process, reused across development hot reloads.
+- `src/server/email`: private local outbox or SMTP transport.
+- `src/server/http`: safe errors, bounded JSON parsing and same-origin mutation checks.
+- `tests`: real PostgreSQL/API integration and browser tests.
+
+Future business modules will be introduced when authorised. Their folders contain only `.gitkeep` files, with no services, routes or premature database tables: catalogue, pricing, enquiries, quotations, checkout, orders, procurement, inventory, payments, delivery, returns, reporting and content.
+
+## Authentication decision
+
+Better Auth supplies scrypt password hashing, verification tokens, signed HttpOnly cookies, database sessions, password recovery, revocation and authentication rate limiting. There is no handwritten password hashing, JWT issuance or session-token generation in this application.
+
+Prisma is deliberately pinned to 7.10.1: the current Better Auth Prisma adapter does not support Prisma 8's different client API. Review compatibility before any major upgrade.
+
+- https://better-auth.com/docs/adapters/prisma
+- https://better-auth.com/docs/authentication/email-password
+- https://better-auth.com/docs/concepts/session-management
+- https://nextjs.org/docs/app/guides/authentication
+
+Email/password is a Phase 1 implementation default. Emails are normalised and unique. Registration cannot set role, active status or a different customer owner. New users are CUSTOMER; dealer access is never self-granted. Passwords are 12–128 characters. Email ownership verification and privileged-user MFA are not implemented in this bounded foundation and must be addressed before an Internet-facing launch.
+
+Sessions expire after seven days, refresh after one day, and require database lookup (cookie caching disabled). HTTPS enables Secure cookies; HttpOnly and SameSite=Lax apply locally too. Revocation removes database sessions. Permission checks fetch current role, active status and dealer approval from PostgreSQL on each protected operation. Password reset expires after 30 minutes, is single use, and revokes existing sessions.
+
+Better Auth stores its session credentials in its supported database schema. Treat database contents and backups as sensitive; do not export tokens into logs or API DTOs. Auth-library session endpoints have the library's own contracts; application `/api/v1` responses never expose session credentials.
+
+## Database
+
+Foundation entities: User, Session, Customer, Address, DealerProfile, AuditLog, BusinessSettings. Better Auth also requires Account (credential hashes), Verification (recovery tokens), and RateLimit (persistent throttling).
+
+- User → many Sessions and Accounts; User → one Customer.
+- Customer → many Addresses and at most one DealerProfile.
+- DealerProfile optionally references its reviewing User.
+- AuditLog optionally references its actor; actor deletion does not delete audit history.
+- BusinessSettings is a singleton enforced by a SQL CHECK, initially FIXUP / INR / Asia/Kolkata.
+- Unique email, session token, provider/account identity, customer user, dealer customer and optional GSTIN.
+- Foreign keys, timestamptz timestamps, lookup/expiry/audit indexes.
+- SQL CHECKs enforce normalised email and Indian address PIN structure. These are documented custom migration constraints not represented by Prisma's schema DSL.
+
+The initial migration is transactional and includes non-sensitive singleton settings, not users or credentials. Customer creation and registration audit run in a transaction after the auth-library transaction commits. A failure of this post-commit provisioning step can leave a library account without a customer; the account API fails closed with PROFILE_UNAVAILABLE. Monitor and repair such provisioning failures before adding operational commerce. Authentication and customer records are not claimed to share one distributed transaction.
+
+## Permission map
+
+All active roles: own account read/update. CUSTOMER has no administrative rights. DEALER receives dealer.access only with an APPROVED DealerProfile. SALES_REP receives leads.assigned (reserved permission, no CRM API yet). ADMIN can read dashboard, audits and settings. SUPER_ADMIN additionally changes settings. Business settings mutations require a reason and write their audit event in the same database transaction.
+
+There is no dealer approval UI or role-editing API in Phase 1. A local-operator CLI can promote an existing account to SUPER_ADMIN with a reason, audit the promotion and revoke all its sessions. No default admin account or password is supplied.
+
+## Operational limits
+
+No paid service was provisioned and no deployment is part of this phase. Configure production HTTPS, SMTP, trusted-proxy headers, least-privilege database users, backups and monitored recovery before launch. Local database setup uses a workspace-owned PostgreSQL cluster and never connects to an existing business database.
+
+Rate limiting defaults to one conservative shared bucket when no trusted proxy header is configured. In production select only a header the ingress overwrites. The application always replaces its internal x-fixup-client-ip header. An arbitrary forwarded header supplied by a browser must never be configured as trusted without an enforcing proxy.
+
+Audit records are append-only through the application. A database owner can still modify them; external tamper-evident storage is outside Phase 1. Reasons must not contain secrets.

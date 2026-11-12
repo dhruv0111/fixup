@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-ink: #183b36;
+  --color-muted: #60736b;
+  --color-paper: #f7f7f2;
+  --color-brand: #205c48;
+  --color-line: #dbe2d9;
+  --font-sans: Arial, Helvetica, sans-serif;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+button,
+a,
+input {
+  -webkit-tap-highlight-color: transparent;
+}
+a,
+button,
+input {
+  outline-offset: 4px;
+}
+button:not(:disabled),
+a {
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+::selection {
+  background: #d5e7a4;
+  color: #183b36;
+}
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  min-height: 46px;
+  padding: 0.7rem 1.2rem;
+  border-radius: 0.6rem;
+  background: #205c48;
+  color: white;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: background 0.15s;
+}
+.button:hover {
+  background: #174834;
+}
+.button-secondary {
+  background: transparent;
+  color: #183b36;
+  border: 1px solid #b6c6b9;
+}
+.button-secondary:hover {
+  background: #e9eee4;
+}
+.field {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid #bac8be;
+  border-radius: 0.5rem;
+  padding: 0.65rem 0.8rem;
+  background: white;
+  color: #183b36;
+}
+.field:focus {
+  outline: 2px solid #205c48;
+}
+.label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.45rem;
+}
+.eyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #526c5c;
+}
