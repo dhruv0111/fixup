@@ -39,7 +39,10 @@ test("public pages, responsive navigation, recovery and not-found render", async
     page.getByRole("button", { name: "Send reset link" }),
   ).toBeVisible();
   await page.goto("/reset-password");
-  await expect(page.getByRole("alert")).toContainText("valid reset link");
+  // Next.js also creates a route-announcer alert outside the page's main content.
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
+    "valid reset link",
+  );
   const notFound = await page.goto("/page-that-does-not-exist");
   expect(notFound?.status()).toBe(404);
   await expect(

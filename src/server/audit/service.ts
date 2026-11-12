@@ -11,12 +11,15 @@ export type AuditAction =
   | "ADDRESS_CREATED"
   | "ADDRESS_UPDATED"
   | "BUSINESS_SETTINGS_UPDATED"
-  | "ROLE_CHANGED";
+  | "ROLE_CHANGED"
+  | "CATALOGUE_UPDATED"
+  | "CONTENT_UPDATED"
+  | "ENQUIRY_RECEIVED";
 
 type AuditEntry = {
   actorId: string | null;
   action: AuditAction;
-  entityType: "User" | "Session" | "Customer" | "Address" | "BusinessSettings";
+  entityType: "User" | "Session" | "Customer" | "Address" | "BusinessSettings" | "Product" | "Category" | "WebsiteContent" | "Faq" | "Policy" | "Enquiry";
   entityId: string;
   reason?: string;
 };

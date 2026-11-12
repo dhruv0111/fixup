@@ -1,40 +1,47 @@
 import "dotenv/config";
+import { parseArgs } from "node:util";
 import { getDb } from "../src/server/db/client";
-import { recordAudit } from "../src/server/audit/service";
+import {
+  promoteOwner,
+  validatePromotionRequest,
+} from "../src/server/operations/admin-promotion";
 
-const email = process.argv[2]?.trim().toLowerCase();
-const reason = process.argv.slice(3).join(" ").trim();
-if (!email || reason.length < 5)
-  throw new Error(
-    "Usage: npm run admin:promote -- existing-email 'reason for granting owner access'",
-  );
-const db = getDb();
+const { values, positionals } = parseArgs({
+  allowPositionals: true,
+  options: {
+    production: { type: "boolean" },
+    operator: { type: "string" },
+    "confirm-user": { type: "string" },
+  },
+});
+const request = {
+  email: positionals[0] ?? "",
+  reason: positionals.slice(1).join(" ").trim(),
+  production: values.production,
+  operator: values.operator,
+  confirmUser: values["confirm-user"],
+};
+const environment = {
+  appEnv: process.env.APP_ENV ?? "development",
+  databaseUrl: process.env.DATABASE_URL ?? "",
+  productionEnabled: process.env.FIXUP_ALLOW_PRIVILEGED_OPERATIONS === "1",
+};
+let db: ReturnType<typeof getDb> | undefined;
 try {
-  const user = await db.user.findUnique({ where: { email } });
-  if (!user?.active)
-    throw new Error(
-      "An active, registered account is required. No account was created.",
-    );
-  await db.$transaction(async (tx) => {
-    await tx.user.update({
-      where: { id: user.id },
-      data: { role: "SUPER_ADMIN" },
-    });
-    await tx.session.deleteMany({ where: { userId: user.id } });
-    await recordAudit(
-      {
-        actorId: null,
-        action: "ROLE_CHANGED",
-        entityType: "User",
-        entityId: user.id,
-        reason: `Local operator: ${reason}`,
-      },
-      tx,
-    );
-  });
+  validatePromotionRequest(request, environment);
+  db = getDb();
+  const changed = await promoteOwner(request, environment, db);
   console.log(
-    "Existing account granted SUPER_ADMIN. All existing sessions were revoked; sign in again.",
+    changed
+      ? "Existing account granted SUPER_ADMIN. All existing sessions were revoked; sign in again."
+      : "Account is already SUPER_ADMIN; no change made.",
   );
+} catch {
+  // No raw DB errors or connection details in an operational log.
+  console.error(
+    "Administrator promotion refused or failed. Check the operator procedure, target eligibility and database configuration; no credentials were logged.",
+  );
+  process.exitCode = 1;
 } finally {
-  await db.$disconnect();
+  await db?.$disconnect();
 }

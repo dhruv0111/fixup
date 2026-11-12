@@ -7,7 +7,10 @@ export function assertSameOrigin(request: Request) {
   ) {
     throw new AppError(403, "INVALID_ORIGIN", "This request is not allowed.");
   }
-  if (!request.headers.get("content-type")?.startsWith("application/json")) {
+  if (
+    request.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !==
+    "application/json"
+  ) {
     throw new AppError(415, "INVALID_CONTENT_TYPE", "Use application/json.");
   }
 }

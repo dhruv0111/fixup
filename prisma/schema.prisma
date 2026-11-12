@@ -30,6 +30,7 @@ model User {
   image         String?
   role          Role      @default(CUSTOMER)
   active        Boolean   @default(true)
+  profileProvisionedAt DateTime? @db.Timestamptz(3)
   createdAt     DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt     DateTime  @updatedAt @db.Timestamptz(3)
   sessions      Session[]
@@ -169,4 +170,124 @@ model BusinessSettings {
   currency    String   @default("INR")
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model Category {
+  id String @id @default(cuid())
+  name String
+  slug String @unique
+  description String @default("")
+  active Boolean @default(true)
+  isDemo Boolean @default(false)
+  products Product[]
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model Product {
+  id String @id @default(cuid())
+  name String
+  slug String @unique
+  sku String @unique
+  brand String
+  packSize String
+  summary String
+  description String
+  active Boolean @default(true)
+  published Boolean @default(false)
+  featured Boolean @default(false)
+  isDemo Boolean @default(false)
+  contentApproved Boolean @default(false)
+  approvalReference String @default("")
+  applications String[] @default([])
+  materials String[] @default([])
+  specifications Json @default("[]")
+  storageInstructions String @default("")
+  availability String @default("ENQUIRE")
+  categoryId String
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  images ProductImage[]
+  documents ProductDocument[]
+  enquiries Enquiry[]
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  @@index([active, published, isDemo])
+  @@index([categoryId])
+}
+
+model ProductImage {
+  id String @id @default(cuid())
+  productId String
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url String
+  alt String
+  approved Boolean @default(false)
+  sortOrder Int @default(0)
+  @@index([productId])
+}
+
+model ProductDocument {
+  id String @id @default(cuid())
+  productId String
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  title String
+  kind String
+  publicUrl String?
+  privateReference String @default("")
+  approved Boolean @default(false)
+  visibility String @default("PRIVATE")
+  @@index([productId])
+}
+
+model WebsiteContent {
+  id String @id @default("singleton")
+  phone String @default("")
+  whatsapp String @default("")
+  email String @default("")
+  address String @default("")
+  workingHours String @default("")
+  aboutText String @default("")
+  aboutApproved Boolean @default(false)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model Faq {
+  id String @id @default(cuid())
+  question String
+  answer String
+  published Boolean @default(false)
+  sortOrder Int @default(0)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model Policy {
+  id String @id
+  title String
+  body String
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model Enquiry {
+  id String @id @default(cuid())
+  requestId String @unique
+  payloadDigest String
+  kind String
+  name String
+  businessName String @default("")
+  phone String
+  email String @default("")
+  address String @default("")
+  city String @default("")
+  postalCode String @default("")
+  businessType String @default("")
+  gstin String @default("")
+  quantity String @default("")
+  location String @default("")
+  message String @default("")
+  consentAt DateTime @default(now()) @db.Timestamptz(3)
+  productId String?
+  product Product? @relation(fields: [productId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([kind, createdAt])
 }

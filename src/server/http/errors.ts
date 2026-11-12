@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
+import { ProfileProvisioningError } from "@/modules/identity/provisioning";
 
 export class AppError extends Error {
   constructor(
@@ -20,6 +21,14 @@ export function json(data: unknown, status = 200) {
 }
 
 export function apiError(error: unknown) {
+  if (error instanceof ProfileProvisioningError)
+    return NextResponse.json(
+      { error: { code: "PROFILE_SETUP_PENDING", message: error.message } },
+      {
+        status: 503,
+        headers: { "Cache-Control": "no-store", "Retry-After": "5" },
+      },
+    );
   if (error instanceof AppError)
     return NextResponse.json(
       { error: { code: error.code, message: error.message } },
@@ -34,7 +43,7 @@ export function apiError(error: unknown) {
           fields: error.flatten().fieldErrors,
         },
       },
-      { status: 422 },
+      { status: 422, headers: { "Cache-Control": "no-store" } },
     );
   if (error instanceof SyntaxError)
     return NextResponse.json(
@@ -44,7 +53,7 @@ export function apiError(error: unknown) {
           message: "Request body must be valid JSON.",
         },
       },
-      { status: 400 },
+      { status: 400, headers: { "Cache-Control": "no-store" } },
     );
   const requestId = randomUUID();
   // Do not log raw exceptions: database errors may include user data or credentials.
@@ -63,7 +72,7 @@ export function apiError(error: unknown) {
         requestId,
       },
     },
-    { status: 500 },
+    { status: 500, headers: { "Cache-Control": "no-store" } },
   );
 }
 

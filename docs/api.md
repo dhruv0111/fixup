@@ -23,6 +23,8 @@ All application APIs run on Node.js. Protected reads return `Cache-Control: priv
 
 Other Better Auth endpoints are not exposed by the route allowlist. Registration accepts no role, active status or customer ID. The wrapper validates request limits/origin; Better Auth owns hashing, session creation, credential validation, recovery and cookie security.
 
+If identity creation succeeds but customer provisioning fails, signup still returns its successful library response. Retrying signup cannot create a second identity. The next authenticated application request retries the idempotent provisioning transaction. If it still fails, the API returns `503` with `{ error: { code: "PROFILE_SETUP_PENDING", message } }`, `Retry-After: 5` and `Cache-Control: no-store`; retry that request after the delay or sign in again. Operators can also run `profiles:repair`. There is no public repair endpoint or user-ID override.
+
 ## Own customer data
 
 - GET `/api/v1/me`: safe user DTO, current permissions and own customer profile.
@@ -42,4 +44,4 @@ Another user's address is indistinguishable from a nonexistent address (404). Cu
 - GET `/api/v1/admin/settings`: ADMIN/SUPER_ADMIN.
 - PATCH `/api/v1/admin/settings`: SUPER_ADMIN; displayName and mandatory reason. Timezone/currency remain the agreed INR/Asia-Kolkata defaults.
 
-Status codes: 400 malformed JSON, 401 missing/expired/revoked session, 403 permission/origin denial, 404 absent or non-owned resource, 409 incomplete profile, 413 oversized body, 415 incorrect media type, 422 invalid fields, 429 auth rate limit, 500 safe generic application error, 503 database readiness unavailable.
+Status codes: 400 malformed JSON, 401 missing/expired/revoked session, 403 permission/origin denial, 404 absent or non-owned resource, 409 profile removed between access checks, 413 oversized body, 415 incorrect media type, 422 invalid fields, 429 auth rate limit, 500 safe generic application error, 503 database readiness or profile recovery unavailable. JSON media type is matched exactly (with optional parameters); `application/jsonp` is rejected. All application error responses are marked `no-store`.

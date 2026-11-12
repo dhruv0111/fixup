@@ -6,6 +6,7 @@ Scope: one Next.js App Router application, Node.js runtime, TypeScript, Tailwind
 
 - `src/app`: pages and thin HTTP adapters.
 - `src/modules/customers`: validated, owner-scoped profile/address operations.
+- `src/modules/identity`: recoverable, idempotent customer provisioning.
 - `src/modules/settings`: the owner-only business settings operation.
 - `src/server/auth`: maintained-library authentication, not custom password/session cryptography.
 - `src/server/permissions`: current database role/status evaluation and explicit permissions.
@@ -30,7 +31,7 @@ Prisma is deliberately pinned to 7.10.1: the current Better Auth Prisma adapter 
 
 Email/password is a Phase 1 implementation default. Emails are normalised and unique. Registration cannot set role, active status or a different customer owner. New users are CUSTOMER; dealer access is never self-granted. Passwords are 12–128 characters. Email ownership verification and privileged-user MFA are not implemented in this bounded foundation and must be addressed before an Internet-facing launch.
 
-Sessions expire after seven days, refresh after one day, and require database lookup (cookie caching disabled). HTTPS enables Secure cookies; HttpOnly and SameSite=Lax apply locally too. Revocation removes database sessions. Permission checks fetch current role, active status and dealer approval from PostgreSQL on each protected operation. Password reset expires after 30 minutes, is single use, and revokes existing sessions.
+Sessions expire after seven days, refresh after one day, and require database lookup (cookie caching disabled). HTTPS enables Secure cookies; HttpOnly and SameSite=Lax apply locally too. Revocation removes database sessions. Account suspension atomically revokes its sessions with system audit entries; a database trigger serializes new session insertion against account updates and rejects inactive users. Reactivation cannot revive removed sessions. Permission checks fetch current role, active status and dealer approval from PostgreSQL on each protected operation. Dealer suspension removes dealer capabilities while retaining ordinary account access. Password reset expires after 30 minutes, is single use, and revokes existing sessions.
 
 Better Auth stores its session credentials in its supported database schema. Treat database contents and backups as sensitive; do not export tokens into logs or API DTOs. Auth-library session endpoints have the library's own contracts; application `/api/v1` responses never expose session credentials.
 
@@ -47,13 +48,15 @@ Foundation entities: User, Session, Customer, Address, DealerProfile, AuditLog, 
 - Foreign keys, timestamptz timestamps, lookup/expiry/audit indexes.
 - SQL CHECKs enforce normalised email and Indian address PIN structure. These are documented custom migration constraints not represented by Prisma's schema DSL.
 
-The initial migration is transactional and includes non-sensitive singleton settings, not users or credentials. Customer creation and registration audit run in a transaction after the auth-library transaction commits. A failure of this post-commit provisioning step can leave a library account without a customer; the account API fails closed with PROFILE_UNAVAILABLE. Monitor and repair such provisioning failures before adding operational commerce. Authentication and customer records are not claimed to share one distributed transaction.
+The initial migration is transactional and includes non-sensitive singleton settings, not users or credentials. Phase 1.1 adds a nullable `User.profileProvisionedAt` completion marker and suspension/session triggers in a second transactional migration. Existing accounts are marked complete only if both customer and registration audit exist. A third transactional migration revokes and audits sessions retained by accounts suspended before hardening, so the upgrade also protects existing inactive accounts.
+
+Customer creation, registration audit and the completion marker commit atomically after the auth-library transaction. The shared provisioner locks the user row, upserts the unique customer owner and preserves existing data/audits. It retries recognised database conflicts up to three attempts. Failure leaves a durable pending marker, logs only an event, internal user ID and bounded error category, and preserves the successfully committed registration response. Protected requests retry provisioning; unavailable recovery returns `503 PROFILE_SETUP_PENDING` with `Retry-After: 5`. Public navigation skips repair so logout remains accessible. `profiles:repair` reconciles active pending accounts in bounded operator-run batches. No background scheduler or paid queue was added. Authentication and customer provisioning remain separate transactions; failure recovery is explicit rather than pretending they are atomic.
 
 ## Permission map
 
 All active roles: own account read/update. CUSTOMER has no administrative rights. DEALER receives dealer.access only with an APPROVED DealerProfile. SALES_REP receives leads.assigned (reserved permission, no CRM API yet). ADMIN can read dashboard, audits and settings. SUPER_ADMIN additionally changes settings. Business settings mutations require a reason and write their audit event in the same database transaction.
 
-There is no dealer approval UI or role-editing API in Phase 1. A local-operator CLI can promote an existing account to SUPER_ADMIN with a reason, audit the promotion and revoke all its sessions. No default admin account or password is supplied.
+There is no dealer approval UI or role-editing API in Phase 1. A controlled operator CLI can promote an existing active account to SUPER_ADMIN with a reason, audit the promotion and revoke all its sessions in one transaction. Production requires explicit operational enablement, operator attribution, exact target ID confirmation and verified email. Repeating an already-completed promotion is a no-op. These safeguards are not a substitute for protecting shell access and database credentials. No default admin account or password is supplied. See [the operator procedure](operations.md).
 
 ## Operational limits
 

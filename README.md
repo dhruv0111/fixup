@@ -1,11 +1,11 @@
-# FIXUP — Phase 1 foundation
+# FIXUP — Phase 1.1 hardened foundation
 
 Local-only Next.js application for FIXUP – Adhesives & Bonding Solutions. Implements authentication, customer identity, permissions, audit logging and basic responsive pages. No real product data, commerce features, paid services or production deployment.
 
 ## Requirements
 
-- Node.js 24 LTS recommended (`.nvmrc`); supported minimum 22.12.
-- npm and PostgreSQL 18 command-line tools on PATH (`initdb`, `pg_ctl`, `psql`, `createdb`).
+- Node.js 24 LTS (`.nvmrc`); Phase 1.1 verified on 24.22.3. Package minimum is 22.12; other runtimes were not revalidated in this phase.
+- npm and PostgreSQL 18 command-line tools on PATH (`initdb`, `pg_ctl`, `psql`, `createdb`, `pg_dump`, `pg_restore`).
 - PostgreSQL can instead be provided independently; follow the manual environment setup below.
 
 ## Quick start with an isolated local database
@@ -43,7 +43,7 @@ For tests create a **separate** `.env.test` with:
 - BETTER_AUTH_URL=http://127.0.0.1:3100
 - MAIL_MODE=file
 
-The runner refuses a non-loopback or non-test database, never loads production data, does not reset the development database, and will not reuse an already-running test web server. Dummy records persist in the isolated test database between runs; each test uses unique generated identities.
+The runner refuses a non-loopback or non-test database, rejects development/test database aliases even with different login credentials, does not reset the development database, and will not reuse an already-running test web server. Dummy records persist in the isolated test database between runs; each test uses unique generated identities. Keep `.env.test` exclusively for disposable local test data.
 
 ## Verification
 
@@ -55,6 +55,7 @@ npm run lint
 npm run format:check
 npm run build
 npm run test:production
+npm run db:recovery-check
 ```
 
 Tests apply committed migrations to the isolated test database and start/stop their own Next.js server on port 3100. They include real PostgreSQL and HTTP tests plus desktop/mobile Chromium tests. Reports: `test-results/results.json` and `playwright-report/index.html` (ignored). Traces are off to avoid collecting credential-bearing network bodies. Failure screenshots contain dummy test data only.
@@ -70,6 +71,20 @@ npm run admin:promote -- you@example.com "Initial local business owner setup"
 ```
 
 This audited operator action revokes the account's existing sessions. Sign in again, then open `/admin`. Do not share operator/database access. No user can promote themselves through registration or an API.
+
+Local promotion is restricted to named loopback development/test databases. Production promotion is refused by default and requires a verified existing identity, explicit target confirmation and the [controlled operator procedure](docs/operations.md). Do not enable privileged operations in the web application's environment.
+
+## Registration recovery
+
+Registration retains its committed identity if customer provisioning fails. The next protected request retries profile setup; APIs return a safe `503 PROFILE_SETUP_PENDING` with `Retry-After: 5` while recovery is unavailable. Public navigation and logout remain usable. Customer creation, its registration audit and the completion marker commit together, with a per-user database lock and a unique customer owner constraint.
+
+An authorised operator can reconcile pending accounts without a browser session:
+
+```sh
+npm run profiles:repair -- --limit 100
+```
+
+Repeated runs preserve existing business data and do not duplicate profiles or registration audits. The command reports counts and exits unsuccessfully if any selected account fails. See [operations](docs/operations.md) for monitoring and backup recovery.
 
 ## Password recovery
 
@@ -101,4 +116,4 @@ Before an external launch: configure HTTPS, SMTP, trusted ingress headers, least
 
 Email/password, India-only addresses, INR and Asia/Kolkata are foundation defaults. No legal policy, tax rate, product specification, price, credit policy or delivery rule has been invented.
 
-See [architecture](docs/architecture.md), [API contracts](docs/api.md) and the [execution report](docs/phase-1-report.md) for decisions, implemented permissions and exact verification results.
+See [architecture](docs/architecture.md), [API contracts](docs/api.md), [operations](docs/operations.md) and the [Phase 1.1 execution report](docs/phase-1.1-report.md) for current decisions and verification results. The [Phase 1 report](docs/phase-1-report.md) records the earlier baseline.

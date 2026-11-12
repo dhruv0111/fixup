@@ -1,5 +1,7 @@
 # FIXUP Phase 1 execution report
 
+Historical baseline. See [Phase 1.1 hardening results](phase-1.1-report.md) for subsequent fixes, Node 24 verification and the local backup/restoration drill.
+
 Date: 12 November 2026 (Asia/Kolkata).
 
 **Outcome: Phase 1 implemented and verified locally.** No external services were created, subscriptions purchased, production deployment performed or later-phase commerce modules implemented. The local Git repository was initialised on `main`; no commit or remote was created.

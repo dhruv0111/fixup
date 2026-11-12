@@ -4,7 +4,8 @@ import { getActor } from "@/server/permissions/service";
 import { SignOutButton } from "@/components/forms/session-actions";
 
 export async function Navigation() {
-  const actor = await getActor(await headers());
+  // Pending profile setup must not break public navigation or the logout control.
+  const actor = await getActor(await headers(), false);
   return (
     <header className="border-b border-line bg-paper">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-8">

@@ -6,6 +6,7 @@ import { getDb } from "@/server/db/client";
 import { getEnv } from "@/config/env";
 import { recordAudit } from "@/server/audit/service";
 import { sendPasswordRecovery } from "@/server/email/service";
+import { provisionAfterRegistration } from "@/modules/identity/provisioning";
 
 function createAuth() {
   const env = getEnv();
@@ -96,22 +97,7 @@ function createAuth() {
             };
           },
           after: async (user) => {
-            await db.$transaction(async (tx) => {
-              await tx.customer.upsert({
-                where: { userId: user.id },
-                create: { userId: user.id },
-                update: {},
-              });
-              await recordAudit(
-                {
-                  actorId: user.id,
-                  action: "USER_REGISTERED",
-                  entityType: "User",
-                  entityId: user.id,
-                },
-                tx,
-              );
-            });
+            await provisionAfterRegistration(user.id);
           },
         },
       },
