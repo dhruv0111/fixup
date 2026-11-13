@@ -36,7 +36,7 @@ server.on("exit", () => {
 });
 let browser;
 const base = `http://127.0.0.1:${port}`;
-const directory = ".local/qa/final";
+const directory = ".local/qa/phase3/public";
 mkdirSync(directory, { recursive: true });
 try {
   let ready = false;
@@ -60,7 +60,7 @@ try {
     "/",
     "/about",
     "/products",
-    "/products/demo-adhesive-1",
+    "/products/fixup-qwik-instant-adhesive",
     "/applications",
     "/become-a-dealer",
     "/bulk-orders",
@@ -78,12 +78,27 @@ try {
   ]) {
     const context = await browser.newContext(options);
     const page = await context.newPage();
+    const pageErrors = [];
+    page.on("pageerror", () => pageErrors.push(true));
     for (const path of paths) {
+      pageErrors.length = 0;
       const response = await page.goto(`${base}${path}`, {
         waitUntil: "networkidle",
       });
       if (response?.status() !== 200)
         throw new Error(`Page capture failed for ${path}.`);
+      await page.locator("main img").evaluateAll((images) =>
+        Promise.all(
+          images.map(async (img) => {
+            img.loading = "eager";
+            await img.decode();
+            if (!img.naturalWidth)
+              throw new Error("Public image failed to load.");
+          }),
+        ),
+      );
+      if (pageErrors.length)
+        throw new Error(`Browser error while capturing ${path}.`);
       if (
         await page.evaluate(
           () => document.documentElement.scrollWidth > innerWidth,

@@ -18,7 +18,14 @@ export type Permission =
   | "enquiries.read"
   | "customers.manage"
   | "dealers.manage"
-  | "pricing.manage";
+  | "pricing.manage"
+  | "suppliers.manage"
+  | "purchasing.manage"
+  | "inventory.read"
+  | "inventory.adjust"
+  | "inventory.reverse"
+  | "orders.manage"
+  | "payments.verify";
 // Management permissions remain separate from website publication permission.
 
 const rolePermissions: Record<string, readonly Permission[]> = {
@@ -26,7 +33,15 @@ const rolePermissions: Record<string, readonly Permission[]> = {
   DEALER: ["account.read", "account.update"],
   SALES_REP: ["account.read", "account.update", "leads.assigned"],
   ADMIN: [
-    "customers.manage", "dealers.manage", "pricing.manage",
+    "orders.manage",
+    "payments.verify",
+    "suppliers.manage",
+    "purchasing.manage",
+    "inventory.read",
+    "inventory.adjust",
+    "customers.manage",
+    "dealers.manage",
+    "pricing.manage",
     "catalogue.read",
     "enquiries.read",
     "account.read",
@@ -36,7 +51,16 @@ const rolePermissions: Record<string, readonly Permission[]> = {
     "settings.read",
   ],
   SUPER_ADMIN: [
-    "customers.manage", "dealers.manage", "pricing.manage",
+    "orders.manage",
+    "payments.verify",
+    "suppliers.manage",
+    "purchasing.manage",
+    "inventory.read",
+    "inventory.adjust",
+    "inventory.reverse",
+    "customers.manage",
+    "dealers.manage",
+    "pricing.manage",
     "catalogue.read",
     "catalogue.write",
     "enquiries.read",

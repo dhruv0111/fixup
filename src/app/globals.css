@@ -609,8 +609,24 @@ summary {
     scroll-behavior: auto !important;
   }
 }
-.management-form input:not([type="checkbox"]), .management-form select, .management-form textarea {
-  width: 100%; min-width: 0; border: 1px solid var(--color-line); border-radius: 8px; padding: 10px 12px; background: white;
+.management-form input:not([type="checkbox"]),
+.management-form select,
+.management-form textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: white;
 }
-.management-form input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--color-primary); }
-.management-form input:focus-visible, .management-form textarea:focus-visible, .management-form select:focus-visible { outline: 2px solid #7952a0; outline-offset: 2px; }
+.management-form input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--color-primary);
+}
+.management-form input:focus-visible,
+.management-form textarea:focus-visible,
+.management-form select:focus-visible {
+  outline: 2px solid #7952a0;
+  outline-offset: 2px;
+}

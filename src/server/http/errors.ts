@@ -22,8 +22,20 @@ export function json(data: unknown, status = 200) {
 }
 
 export function apiError(error: unknown) {
-  if (error instanceof Prisma.PrismaClientKnownRequestError && ["P2002", "P2003", "P2025", "P2034"].includes(error.code))
-    return NextResponse.json({ error: { code: "CONFLICT", message: "This record already exists, has changed, or references unavailable data. Refresh and check your entries." } }, { status: 409, headers: { "Cache-Control": "no-store" } });
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    ["P2002", "P2003", "P2004", "P2025", "P2034"].includes(error.code)
+  )
+    return NextResponse.json(
+      {
+        error: {
+          code: "CONFLICT",
+          message:
+            "This record already exists, has changed, or references unavailable data. Refresh and check your entries.",
+        },
+      },
+      { status: 409, headers: { "Cache-Control": "no-store" } },
+    );
   if (error instanceof ProfileProvisioningError)
     return NextResponse.json(
       { error: { code: "PROFILE_SETUP_PENDING", message: error.message } },

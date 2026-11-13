@@ -28,22 +28,25 @@ enum CustomerCategory {
 }
 
 model User {
-  id                   String          @id
+  id                   String              @id
   name                 String
-  email                String          @unique
-  emailVerified        Boolean         @default(false)
+  email                String              @unique
+  emailVerified        Boolean             @default(false)
   image                String?
-  role                 Role            @default(CUSTOMER)
-  active               Boolean         @default(true)
-  managementVersion    Int             @default(0)
-  profileProvisionedAt DateTime?       @db.Timestamptz(3)
-  createdAt            DateTime        @default(now()) @db.Timestamptz(3)
-  updatedAt            DateTime        @updatedAt @db.Timestamptz(3)
+  role                 Role                @default(CUSTOMER)
+  active               Boolean             @default(true)
+  managementVersion    Int                 @default(0)
+  profileProvisionedAt DateTime?           @db.Timestamptz(3)
+  createdAt            DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime            @updatedAt @db.Timestamptz(3)
   sessions             Session[]
   accounts             Account[]
   customer             Customer?
   auditLogs            AuditLog[]
-  dealerReviews        DealerProfile[] @relation("DealerReviewer")
+  dealerReviews        DealerProfile[]     @relation("DealerReviewer")
+  stockMovements       StockMovement[]
+  paymentSubmissions   PaymentSubmission[]
+  paymentRecords       PaymentRecord[]
 
   @@index([role, active])
 }
@@ -114,6 +117,8 @@ model Customer {
   user         User             @relation(fields: [userId], references: [id], onDelete: Restrict)
   addresses    Address[]
   dealer       DealerProfile?
+  cartItems    CartItem[]
+  salesOrders  SalesOrder[]
 }
 
 model Address {
@@ -235,28 +240,37 @@ model Product {
 }
 
 model ProductVariant {
-  id                String       @id @default(cuid())
+  id                String              @id @default(cuid())
   productId         String
-  product           Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  product           Product             @relation(fields: [productId], references: [id], onDelete: Restrict)
   name              String
   packSize          String
-  sku               String?      @unique
-  active            Boolean      @default(true)
-  published         Boolean      @default(false)
-  contentApproved   Boolean      @default(false)
-  approvalReference String       @default("")
+  sku               String?             @unique
+  active            Boolean             @default(true)
+  published         Boolean             @default(false)
+  contentApproved   Boolean             @default(false)
+  approvalReference String              @default("")
   imageUrl          String?
-  imageAlt          String       @default("")
-  imageApproved     Boolean      @default(false)
-  representative    Boolean      @default(true)
+  imageAlt          String              @default("")
+  imageApproved     Boolean             @default(false)
+  representative    Boolean             @default(true)
   mrpPaise          Int?
-  mrpConfirmed      Boolean      @default(false)
+  mrpConfirmed      Boolean             @default(false)
   mrpReferencePaise Int?
-  mrpReferenceNote  String       @default("")
-  version           Int          @default(0)
+  mrpReferenceNote  String              @default("")
+  version           Int                 @default(0)
   prices            PriceEntry[]
-  createdAt         DateTime     @default(now()) @db.Timestamptz(3)
-  updatedAt         DateTime     @updatedAt @db.Timestamptz(3)
+  suppliers         SupplierVariant[]
+  purchaseLines     PurchaseOrderLine[]
+  stockLots         StockLot[]
+  stockMovements    StockMovement[]
+  stockSetting      StockSetting?
+  cartItems         CartItem[]
+  salesLines        SalesOrderLine[]
+  reservations      StockReservation[]
+  reservationEvents ReservationEvent[]
+  createdAt         DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime            @updatedAt @db.Timestamptz(3)
 
   @@unique([productId, packSize])
   @@index([productId, active, published])
@@ -389,4 +403,397 @@ model Enquiry {
 
   @@index([kind, createdAt])
   @@index([payloadDigest, createdAt])
+}
+
+model Supplier {
+  id           String            @id @default(cuid())
+  name         String
+  contactName  String
+  phone        String
+  email        String
+  address      String
+  city         String
+  state        String
+  postalCode   String
+  gstin        String?           @unique
+  supplierType String
+  paymentTerms String
+  notes        String            @default("")
+  status       String            @default("ACTIVE")
+  identityKey  String            @unique
+  version      Int               @default(0)
+  variants     SupplierVariant[]
+  purchases    PurchaseOrder[]
+  createdAt    DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime          @updatedAt @db.Timestamptz(3)
+
+  @@index([status, name])
+}
+
+model SupplierVariant {
+  supplierId String
+  variantId  String
+  supplier   Supplier       @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  variant    ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  @@id([supplierId, variantId])
+}
+
+model PurchaseOrder {
+  id               String              @id @default(cuid())
+  number           String              @unique @default(dbgenerated("('FIX-PO-'::text || lpad((nextval('fixup_po_number'::regclass))::text, 8, '0'::text))"))
+  requestId        String              @unique
+  payloadDigest    String
+  supplierId       String
+  supplier         Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierSnapshot Json
+  status           String              @default("DRAFT")
+  expectedDate     DateTime?           @db.Date
+  notes            String              @default("")
+  subtotalPaise    Int
+  discountPaise    Int
+  taxPaise         Int
+  totalPaise       Int
+  version          Int                 @default(0)
+  createdById      String
+  createdAt        DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime            @updatedAt @db.Timestamptz(3)
+  lines            PurchaseOrderLine[]
+  receipts         GoodsReceipt[]
+
+  @@index([supplierId, createdAt])
+  @@index([status, createdAt])
+}
+
+model PurchaseOrderLine {
+  id               String             @id @default(cuid())
+  purchaseOrderId  String
+  purchaseOrder    PurchaseOrder      @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  variantId        String
+  variant          ProductVariant     @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  productName      String
+  variantName      String
+  packSize         String
+  sku              String?
+  quantity         Int
+  receivedQuantity Int                @default(0)
+  ratePaise        Int
+  taxBps           Int
+  discountPaise    Int
+  subtotalPaise    Int
+  taxPaise         Int
+  totalPaise       Int
+  receipts         GoodsReceiptLine[]
+
+  @@unique([purchaseOrderId, variantId])
+}
+
+model GoodsReceipt {
+  id               String             @id @default(cuid())
+  number           String             @unique @default(dbgenerated("('FIX-GRN-'::text || lpad((nextval('fixup_grn_number'::regclass))::text, 8, '0'::text))"))
+  requestId        String             @unique
+  payloadDigest    String
+  purchaseOrderId  String
+  purchaseOrder    PurchaseOrder      @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  status           String             @default("DRAFT")
+  invoiceReference String
+  notes            String             @default("")
+  version          Int                @default(0)
+  createdById      String
+  completedById    String?
+  completedAt      DateTime?          @db.Timestamptz(3)
+  reversedById     String?
+  reversedAt       DateTime?          @db.Timestamptz(3)
+  correctionReason String?
+  createdAt        DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime           @updatedAt @db.Timestamptz(3)
+  lines            GoodsReceiptLine[]
+
+  @@index([purchaseOrderId, createdAt])
+  @@index([status, createdAt])
+}
+
+model GoodsReceiptLine {
+  id             String            @id @default(cuid())
+  receiptId      String
+  receipt        GoodsReceipt      @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  purchaseLineId String
+  purchaseLine   PurchaseOrderLine @relation(fields: [purchaseLineId], references: [id], onDelete: Restrict)
+  quantity       Int
+  batchNumber    String?
+  manufacturedAt DateTime?         @db.Date
+  expiresAt      DateTime?         @db.Date
+  lot            StockLot?
+  movements      StockMovement[]
+
+  @@unique([receiptId, purchaseLineId])
+}
+
+model StockLot {
+  id             String            @id @default(cuid())
+  variantId      String
+  variant        ProductVariant    @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  receiptLineId  String?           @unique
+  receiptLine    GoodsReceiptLine? @relation(fields: [receiptLineId], references: [id], onDelete: Restrict)
+  batchNumber    String?
+  manufacturedAt DateTime?         @db.Date
+  expiresAt      DateTime?         @db.Date
+  createdAt      DateTime          @default(now()) @db.Timestamptz(3)
+  movements      StockMovement[]
+
+  @@unique([id, variantId])
+  @@index([variantId, expiresAt])
+}
+
+model StockAdjustment {
+  id            String         @id @default(cuid())
+  requestId     String         @unique
+  payloadDigest String
+  kind          String
+  reason        String
+  actorId       String
+  createdAt     DateTime       @default(now()) @db.Timestamptz(3)
+  movement      StockMovement?
+}
+
+model StockMovement {
+  id              String            @id @default(cuid())
+  variantId       String
+  variant         ProductVariant    @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  lotId           String
+  lot             StockLot          @relation(fields: [lotId, variantId], references: [id, variantId], onDelete: Restrict)
+  kind            String
+  availableDelta  Int
+  damagedDelta    Int               @default(0)
+  previousStock   Int               @default(0)
+  updatedStock    Int               @default(0)
+  previousDamaged Int               @default(0)
+  updatedDamaged  Int               @default(0)
+  receiptLineId   String?
+  receiptLine     GoodsReceiptLine? @relation(fields: [receiptLineId], references: [id], onDelete: Restrict)
+  adjustmentId    String?           @unique
+  adjustment      StockAdjustment?  @relation(fields: [adjustmentId], references: [id], onDelete: Restrict)
+  reason          String
+  actorId         String
+  actor           User              @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  createdAt       DateTime          @default(now()) @db.Timestamptz(3)
+
+  @@unique([receiptLineId, kind])
+  @@index([variantId, createdAt])
+  @@index([lotId, createdAt])
+}
+
+model StockSetting {
+  variantId       String         @id
+  variant         ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  minimumQuantity Int?
+  version         Int            @default(0)
+}
+
+model CartItem {
+  customerId     String
+  variantId      String
+  customer       Customer       @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  variant        ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  quantity       Int
+  seenPricePaise Int
+  seenCategory   String
+  updatedAt      DateTime       @updatedAt @db.Timestamptz(3)
+
+  @@id([customerId, variantId])
+}
+
+model SalesSettings {
+  id                   String    @id @default("singleton")
+  enabled              Boolean   @default(false)
+  upiId                String    @default("")
+  holderName           String    @default("")
+  bankName             String    @default("")
+  accountNumber        String    @default("")
+  ifsc                 String    @default("")
+  branch               String    @default("")
+  instructions         String    @default("")
+  taxBps               Int?
+  taxMode              String?
+  deliveryPaise        Int?
+  reservationMinutes   Int?
+  lateReviewMinutes    Int?
+  customerCancelUnpaid Boolean?
+  adminCancelUnpaid    Boolean?
+  adminCancelPaid      Boolean?
+  confirmedById        String?
+  confirmedAt          DateTime? @db.Timestamptz(3)
+  version              Int       @default(0)
+}
+
+model SalesOrder {
+  id                     String              @id @default(cuid())
+  number                 String              @unique @default(dbgenerated("('FIX-SO-'::text || (nextval('fixup_so_number'::regclass))::text)"))
+  requestId              String              @unique
+  payloadDigest          String
+  customerId             String
+  customer               Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  category               CustomerCategory
+  customerSnapshot       Json
+  addressSnapshot        Json
+  paymentDetails         Json
+  cancellationRules      Json
+  pricingSource          Json
+  taxMode                String
+  taxBps                 Int
+  subtotalPaise          Int
+  taxPaise               Int
+  deliveryPaise          Int
+  totalPaise             Int
+  reservationMinutes     Int
+  lateReviewMinutes      Int
+  reservationExpiresAt   DateTime            @db.Timestamptz(3)
+  paymentMethod          String
+  status                 String              @default("PENDING_PAYMENT")
+  paymentStatus          String              @default("UNPAID")
+  lateReviewRequired     Boolean             @default(false)
+  overpaymentResolved    Boolean             @default(false)
+  refundDecisionRequired Boolean             @default(false)
+  notes                  String              @default("")
+  internalNotes          String              @default("")
+  version                Int                 @default(0)
+  cancelledAt            DateTime?           @db.Timestamptz(3)
+  cancelledById          String?
+  createdAt              DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime            @updatedAt @db.Timestamptz(3)
+  lines                  SalesOrderLine[]
+  reservations           StockReservation[]
+  submissions            PaymentSubmission[]
+  payments               PaymentRecord[]
+  events                 SalesOrderEvent[]
+
+  @@index([customerId, createdAt])
+  @@index([status, paymentStatus, createdAt])
+}
+
+model SalesOrderLine {
+  id             String            @id @default(cuid())
+  orderId        String
+  order          SalesOrder        @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  variantId      String
+  variant        ProductVariant    @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  productName    String
+  variantName    String
+  sku            String?
+  packSize       String
+  imageUrl       String?
+  quantity       Int
+  unitPricePaise Int
+  linePricePaise Int
+  taxPaise       Int
+  reservation    StockReservation?
+
+  @@unique([orderId, variantId])
+}
+
+model StockReservation {
+  id          String             @id @default(cuid())
+  orderId     String
+  order       SalesOrder         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  orderLineId String             @unique
+  line        SalesOrderLine     @relation(fields: [orderLineId], references: [id], onDelete: Restrict)
+  variantId   String
+  variant     ProductVariant     @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  quantity    Int
+  status      String             @default("ACTIVE")
+  expiresAt   DateTime?          @db.Timestamptz(3)
+  changedById String?
+  reason      String
+  version     Int                @default(0)
+  createdAt   DateTime           @default(now()) @db.Timestamptz(3)
+  events      ReservationEvent[]
+
+  @@unique([orderId, variantId])
+  @@index([variantId, status])
+  @@index([status, expiresAt])
+}
+
+model ReservationEvent {
+  id             String           @id @default(dbgenerated("(gen_random_uuid())::text"))
+  reservationId  String
+  reservation    StockReservation @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  variantId      String
+  variant        ProductVariant   @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  version        Int
+  previousStatus String?
+  status         String
+  quantityDelta  Int
+  expiresAt      DateTime?        @db.Timestamptz(3)
+  actorId        String?
+  reason         String
+  createdAt      DateTime         @default(now()) @db.Timestamptz(3)
+
+  @@unique([reservationId, version])
+  @@index([variantId, createdAt])
+}
+
+model PaymentSubmission {
+  id                 String         @id @default(cuid())
+  requestId          String         @unique
+  payloadDigest      String
+  orderId            String
+  order              SalesOrder     @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  submittedById      String
+  submittedBy        User           @relation(fields: [submittedById], references: [id], onDelete: Restrict)
+  method             String
+  reference          String
+  referenceKey       String
+  paidOn             DateTime       @db.Date
+  remarks            String         @default("")
+  imageBytes         Bytes
+  imageHash          String
+  imageSize          Int
+  width              Int
+  height             Int
+  originalName       String
+  duplicateReference Boolean        @default(false)
+  late               Boolean        @default(false)
+  status             String         @default("SUBMITTED")
+  version            Int            @default(0)
+  reviewedById       String?
+  reviewedAt         DateTime?      @db.Timestamptz(3)
+  internalNotes      String         @default("")
+  publicMessage      String         @default("")
+  createdAt          DateTime       @default(now()) @db.Timestamptz(3)
+  payment            PaymentRecord?
+
+  @@index([referenceKey])
+  @@index([status, createdAt])
+}
+
+model PaymentRecord {
+  id            String             @id @default(cuid())
+  requestId     String             @unique
+  payloadDigest String
+  orderId       String
+  order         SalesOrder         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  submissionId  String?            @unique
+  submission    PaymentSubmission? @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+  kind          String
+  method        String
+  amountPaise   Int
+  bankReference String
+  referenceKey  String             @unique
+  verifiedById  String
+  verifiedBy    User               @relation(fields: [verifiedById], references: [id], onDelete: Restrict)
+  notes         String
+  createdAt     DateTime           @default(now()) @db.Timestamptz(3)
+}
+
+model SalesOrderEvent {
+  id            String     @id @default(cuid())
+  orderId       String
+  order         SalesOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  kind          String
+  message       String
+  internalNotes String     @default("")
+  actorId       String?
+  createdAt     DateTime   @default(now()) @db.Timestamptz(3)
+
+  @@index([orderId, createdAt])
 }

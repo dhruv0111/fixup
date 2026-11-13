@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Next 16.4.6 can replay stale HMR versions from its persistent dev cache.
+  // Keep Turbopack development but start each process with a fresh module graph.
+  experimental: {
+    turbopackFileSystemCacheForDev: false,
+  },
   images: {
     remotePatterns: [
       {

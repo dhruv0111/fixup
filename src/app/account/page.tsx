@@ -16,11 +16,25 @@ export default async function AccountPage() {
       <p className="eyebrow">YOUR FIXUP</p>
       <h1 className="mt-4 text-4xl font-semibold tracking-tight">My account</h1>
       <p className="mt-3 text-muted">Welcome, {actor.name}.</p>
-      <nav aria-label="Account management" className="mt-6 flex flex-wrap gap-3">
-        <Link className="button button-secondary" href="/account/profile">Edit profile</Link>
-        <Link className="button button-secondary" href="/account/addresses">Delivery addresses</Link>
-        <Link className="button button-secondary" href="/account/dealer">Dealer application</Link>
-        <Link className="button button-secondary" href="/account/orders">Order history</Link>
+      <nav
+        aria-label="Account management"
+        className="mt-6 flex flex-wrap gap-3"
+      >
+        <Link className="button button-secondary" href="/account/profile">
+          Edit profile
+        </Link>
+        <Link className="button button-secondary" href="/account/addresses">
+          Delivery addresses
+        </Link>
+        <Link className="button button-secondary" href="/account/dealer">
+          Dealer application
+        </Link>
+        <Link className="button button-secondary" href="/account/cart">
+          Shopping cart
+        </Link>
+        <Link className="button button-secondary" href="/account/orders">
+          Order history
+        </Link>
       </nav>
       <div className="mt-8 grid gap-6 md:grid-cols-2">
         <section className="rounded-2xl border border-line bg-white p-7">

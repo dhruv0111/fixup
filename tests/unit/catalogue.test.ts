@@ -38,6 +38,10 @@ test("catalogue rejects invalid paging and unsafe category input", () => {
   assert.deepEqual(catalogueQuery.parse({}), { q: "", category: "", page: 1 });
 });
 test("media links exclude private, executable and external resources", () => {
+  for (const url of ["", "not a URL", "/brand/../../.env"]) {
+    assert.equal(imageUrl.safeParse(url).success, false);
+    assert.equal(documentUrl.safeParse(url).success, false);
+  }
   assert.equal(
     imageUrl.safeParse(
       "https://res.cloudinary.com/demo/image/upload/example.webp",

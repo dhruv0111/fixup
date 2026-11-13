@@ -1,12 +1,12 @@
-# FIXUP — Public website and product catalogue
+# FIXUP — Catalogue, inventory and sales
 
-Local-only Next.js application for FIXUP – Adhesives & Bonding Solutions. Includes the Phase 1/1.1 authentication foundation and the Phase 2 public catalogue, enquiry forms, WhatsApp links, configurable content and SEO. No checkout, payments, inventory, orders, paid services or production deployment. Search indexing remains disabled pending launch approval.
+Local-only Next.js application for FIXUP – Adhesives & Bonding Solutions. Includes the Phase 1/1.1 authentication foundation, Phase 2 public catalogue and enquiries, Phase 3 customer/dealer administration and shared pricing, Phase 4 supplier, purchasing and variant inventory management, and Phase 5 cart, sales orders, stock reservations and manual UPI/bank payment review. No payment gateway, paid services or production deployment. Search indexing remains disabled pending launch approval.
 
-See [Phase 2 API and content operations](docs/phase-2-api.md), [implementation checklist](docs/phase-2-checklist.md) and [verification report](docs/phase-2.1-report.md). Product photos, actual brands, specifications and policy approval still require owner input. Development preview products are explicitly labelled and excluded in production.
+See [Phase 2 API and content operations](docs/phase-2-api.md), [implementation checklist](docs/phase-2-checklist.md) and [verification report](docs/phase-2.1-report.md). The supplied QWIK photos and product identity are integrated; actual SKUs, selling prices, confirmed MRP, technical documents and policy approval still require owner input. Development preview products are explicitly labelled and excluded in production.
 
 ## Requirements
 
-- Node.js 24 LTS (`.nvmrc`); Phase 1.1 verified on 24.22.3. Package minimum is 22.12; other runtimes were not revalidated in this phase.
+- Node.js 24 LTS (`.nvmrc`); Phase 1.1 verified on 24.22.3. Package minimum is 22.12. Phase 3–5 checks in this checkout use Node 26.4.0; the earlier Node 24 results are historical.
 - npm and PostgreSQL 18 command-line tools on PATH (`initdb`, `pg_ctl`, `psql`, `createdb`, `pg_dump`, `pg_restore`).
 - PostgreSQL can instead be provided independently; follow the manual environment setup below.
 
@@ -17,6 +17,7 @@ npm ci
 npm run setup:local
 npm run db:migrate
 npm run db:health
+npm run db:seed:qwik
 npm run dev
 ```
 
@@ -62,7 +63,7 @@ npm run db:recovery-check
 
 Tests apply committed migrations to the isolated test database and start/stop their own Next.js server on port 3100. They include real PostgreSQL and HTTP tests plus desktop/mobile Chromium tests. Reports: `test-results/results.json` and `playwright-report/index.html` (ignored). Traces are off to avoid collecting credential-bearing network bodies. Failure screenshots contain dummy test data only.
 
-Build and browser tests both use `.next`; run them sequentially. `npm run start` runs a built app locally on port 3000. This does not deploy it. A production-mode local smoke test may use the local development environment; an external production environment must use APP_ENV=production.
+Build and browser tests both use `.next`; stop the local dev server and run them sequentially. `npm run start` runs a built app locally on port 3000. This does not deploy it. A production-mode local smoke test may use the local development environment; an external production environment must use APP_ENV=production.
 
 ## Local administrator access
 
@@ -119,3 +120,31 @@ Before an external launch: configure HTTPS, SMTP, trusted ingress headers, least
 Email/password, India-only addresses, INR and Asia/Kolkata are foundation defaults. No legal policy, tax rate, product specification, price, credit policy or delivery rule has been invented.
 
 See [architecture](docs/architecture.md), [API contracts](docs/api.md), [operations](docs/operations.md) and the [Phase 1.1 execution report](docs/phase-1.1-report.md) for current decisions and verification results. The [Phase 1 report](docs/phase-1-report.md) records the earlier baseline.
+
+## Phase 3 management
+
+See [Phase 2 independent audit](docs/phase-2-final-audit.md), [Phase 3 API and frontend contracts](docs/phase-3-api.md) and [Phase 3 verification report](docs/phase-3-report.md). Customer profile, delivery addresses, dealer application and the future order-history page are linked from `/account`. Authorized administrators manage customers, dealer review and shared price lists from `/admin`; the owner also manages products and variants. Account pricing appears on product details after signing in. No individual dealer price overrides, checkout, orders, stock transactions or deployment are included.
+
+`npm run dev` regenerates Prisma automatically before startup. After schema/migration changes, run `npm run db:migrate` and restart the dev server to replace its cached client. QWIK setup is repeatable and preserves existing administrator edits; it never invents prices/SKUs or confirms the image-derived MRP.
+
+## Phase 4 purchasing and inventory
+
+See [the implementation plan](docs/phase-4-plan.md), [API/operating rules](docs/phase-4-api.md), and [verification report](docs/phase-4-report.md). After `npm run db:migrate` and a dev-server restart, authorized admins can open Suppliers, Purchase Orders, Goods Receiving, Inventory, Ledger, Adjustments and Reports from `/admin`. Enter actual suppliers, rates and opening quantities through the protected forms; no supplier or inventory demo data is seeded into development or production. PO/GRN drafts do not create stock; confirmed GRNs and confirmed adjustments post immutable ledger entries.
+
+Inventory is single-location, in integer units per variant. Damaged stock is separate from available units; no reservations, sales orders, checkout, payment or dispatch are implemented. Super Admin reversal is limited to receipt lots that still have enough undamaged available stock. Reports and CSV exports remain protected.
+
+## Phase 5 sales and manual payment review
+
+Customer/dealer flow: product variant → shopping cart → reviewed checkout with saved address → Sales Order → stock reservation → direct UPI/bank transfer outside the website → private screenshot submission → admin checks the actual bank record → full verified payment and resolved exceptions → Ready for Dispatch. Physical stock is not deducted until a later dispatch phase.
+
+Use `/account/cart`, `/account/checkout`, `/account/orders` and order detail pages. Admins use `/admin/sales/orders` and `/admin/sales/payments`. Only Super Admin can configure `/admin/sales/settings`. Checkout stays disabled until the owner explicitly confirms actual payment details, tax mode/rate (zero allowed), delivery charge (zero allowed), reservation duration, near-expiry review window and cancellation rules. No real business banking data or invented policies are seeded.
+
+Private proof is decoded and re-encoded as PNG, stored transactionally inside PostgreSQL, and streamed only to the order owner or authorized payment reviewers. Include database backups in the private financial-document retention policy. Partial/late/excess payments remain reviewable; screenshots never confirm payment. Refund recording documents an externally completed transfer and never initiates one.
+
+Reservation cleanup is a protected admin action and trusted server command:
+
+```sh
+npm run orders:expire -- --confirm-expire
+```
+
+Run in the intended private server environment; each execution handles up to 100 orders. Repeat until zero. No automated scheduler is configured. [API contracts and operation notes](docs/phase-5-api.md), [pre-implementation audit/plan](docs/phase-5-plan.md), [execution report](docs/phase-5-report.md) and [screenshot index](docs/phase-5-screenshots.md) document behavior, verification and launch blockers. No dispatch, gateway, automatic reconciliation or automatic refunds are implemented.

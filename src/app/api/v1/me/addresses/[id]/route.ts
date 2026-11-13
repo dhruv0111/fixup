@@ -1,7 +1,11 @@
 import { apiError, json } from "@/server/http/errors";
 import { requirePermission } from "@/server/permissions/service";
 import { assertSameOrigin, readJson } from "@/server/http/request";
-import { readAddress, updateAddress, deleteAddress } from "@/modules/customers/service";
+import {
+  readAddress,
+  updateAddress,
+  deleteAddress,
+} from "@/modules/customers/service";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -10,7 +14,9 @@ export async function DELETE(request: Request, context: Context) {
     assertSameOrigin(request);
     const actor = await requirePermission(request.headers, "account.update");
     return json(await deleteAddress(actor, (await context.params).id));
-  } catch (error) { return apiError(error); }
+  } catch (error) {
+    return apiError(error);
+  }
 }
 
 export async function GET(request: Request, context: Context) {

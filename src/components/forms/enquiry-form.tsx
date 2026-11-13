@@ -2,7 +2,12 @@
 import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
 import { enquirySchema } from "@/modules/enquiries/validation";
-type ProductOption = { id: string; name: string; sku: string | null; isDemo: boolean };
+type ProductOption = {
+  id: string;
+  name: string;
+  sku: string | null;
+  isDemo: boolean;
+};
 type Props = {
   kind: "DEALER" | "BULK" | "CONTACT";
   token: string;
@@ -168,7 +173,8 @@ export function EnquiryForm({
               </option>
               {products.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name} · {p.sku}
+                  {p.name}
+                  {p.sku ? ` · ${p.sku}` : ""}
                   {p.isDemo ? " (Demo)" : ""}
                 </option>
               ))}

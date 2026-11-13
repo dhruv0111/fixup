@@ -7,6 +7,7 @@
     "node": ">=22.12.0"
   },
   "scripts": {
+    "predev": "prisma generate",
     "dev": "next dev --hostname 127.0.0.1",
     "build": "prisma generate && next build --webpack",
     "start": "next start --hostname 127.0.0.1",
@@ -15,6 +16,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:generate": "prisma generate",
+    "db:seed:qwik": "node --import tsx scripts/seed-qwik.ts",
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:status": "prisma migrate status",
@@ -29,7 +31,8 @@
     "test:unit": "node --import tsx --test tests/unit/*.test.ts",
     "test:e2e": "node scripts/run-tests.mjs",
     "test:production": "node scripts/production-smoke.mjs",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "orders:expire": "node --conditions=react-server --import tsx scripts/expire-reservations.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.1",
@@ -42,7 +45,8 @@
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "server-only": "0.0.1",
-    "zod": "4.6.7"
+    "zod": "4.6.7",
+    "sharp": "0.35.5"
   },
   "overrides": {
     "@typescript-eslint/typescript-estree": {

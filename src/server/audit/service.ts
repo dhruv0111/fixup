@@ -21,7 +21,13 @@ export type AuditAction =
   | "DEALER_STATUS_CHANGED"
   | "PRICE_LIST_CHANGED"
   | "CATEGORY_PRICE_LIST_CHANGED"
-  | "VARIANT_CHANGED";
+  | "VARIANT_CHANGED"
+  | "SUPPLIER_CHANGED"
+  | "PURCHASE_CHANGED"
+  | "GOODS_RECEIPT_CHANGED"
+  | "STOCK_ADJUSTED"
+  | "STOCK_THRESHOLD_CHANGED"
+  | "SALES_CHANGED";
 
 type AuditEntry = {
   actorId: string | null;
@@ -41,7 +47,14 @@ type AuditEntry = {
     | "DealerProfile"
     | "PriceList"
     | "CategoryPriceList"
-    | "ProductVariant";
+    | "ProductVariant"
+    | "Supplier"
+    | "PurchaseOrder"
+    | "GoodsReceipt"
+    | "StockAdjustment"
+    | "StockSetting"
+    | "SalesOrder"
+    | "SalesSettings";
   // No account credentials or private documents belong in audit records.
   entityId: string;
   reason?: string;

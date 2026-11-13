@@ -9,7 +9,8 @@ export const slugSchema = z
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 // Only reviewed, public Cloudinary assets can enter the image optimiser.
 const remoteImageUrl = z.url().refine((value) => {
-  const url = new URL(value);
+  const url = URL.parse(value);
+  if (!url) return false;
   return (
     url.protocol === "https:" &&
     url.hostname === "res.cloudinary.com" &&
@@ -24,7 +25,8 @@ const remoteImageUrl = z.url().refine((value) => {
 }, "Use an approved public Cloudinary raster image URL.");
 export const imageUrl = z.union([z.enum(approvedLocalImages), remoteImageUrl]);
 export const documentUrl = z.url().refine((value) => {
-  const url = new URL(value);
+  const url = URL.parse(value);
+  if (!url) return false;
   return (
     url.protocol === "https:" &&
     url.hostname === "res.cloudinary.com" &&

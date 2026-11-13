@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getActor } from "@/server/permissions/service";
 import { getDb } from "@/server/db/client";
 import Link from "next/link";
+import { OperationsNav } from "@/components/inventory/shared";
 
 export const metadata = { title: "Admin dashboard" };
 export default async function AdminPage() {
@@ -44,10 +45,34 @@ export default async function AdminPage() {
         Account activity and access at a glance.
       </p>
       <div className="mt-6 flex flex-wrap gap-4">
-        <Link className="button button-secondary" href="/admin/customers">Customers</Link>
-        <Link className="button button-secondary" href="/admin/dealers">Dealers</Link>
-        <Link className="button button-secondary" href="/admin/price-lists">Shared price lists</Link>
-        {actor.permissions.includes("catalogue.write") && <Link className="button button-secondary" href="/admin/products">Products & variants</Link>}
+        <Link className="button button-secondary" href="/admin/sales/orders">
+          Sales orders
+        </Link>
+        <Link className="button button-secondary" href="/admin/sales/payments">
+          Payment verification
+        </Link>
+        {actor.permissions.includes("settings.update") && (
+          <Link
+            className="button button-secondary"
+            href="/admin/sales/settings"
+          >
+            Sales settings
+          </Link>
+        )}
+        <Link className="button button-secondary" href="/admin/customers">
+          Customers
+        </Link>
+        <Link className="button button-secondary" href="/admin/dealers">
+          Dealers
+        </Link>
+        <Link className="button button-secondary" href="/admin/price-lists">
+          Shared price lists
+        </Link>
+        {actor.permissions.includes("catalogue.write") && (
+          <Link className="button button-secondary" href="/admin/products">
+            Products & variants
+          </Link>
+        )}
         {actor.permissions.includes("enquiries.read") && (
           <Link className="button button-secondary" href="/admin/enquiries">
             Customer enquiries
@@ -59,6 +84,11 @@ export default async function AdminPage() {
           </Link>
         )}
       </div>
+      {actor.permissions.includes("inventory.read") && (
+        <div className="mt-6">
+          <OperationsNav />
+        </div>
+      )}
       <div className="my-8 grid gap-4 sm:grid-cols-3">
         {[
           ["Registered accounts", users],

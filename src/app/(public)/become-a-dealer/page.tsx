@@ -22,8 +22,13 @@ export default function DealerPage() {
       <div className="editorial-grid">
         <EnquiryForm kind="DEALER" token={challenge()} />
         <aside className="info-panel h-fit">
-          <Link className="button mb-6" href="/account/dealer">Apply through your account</Link>
-          <p className="mb-6 text-sm text-muted">Sign in or register to submit a dealer application and track its approval. This public form sends an initial enquiry.</p>
+          <Link className="button mb-6" href="/account/dealer">
+            Apply through your account
+          </Link>
+          <p className="mb-6 text-sm text-muted">
+            Sign in or register to submit a dealer application and track its
+            approval. This public form sends an initial enquiry.
+          </p>
           <h2 className="text-2xl font-semibold">Let’s work together.</h2>
           <p className="body-copy">
             For hardware shops, retailers and wholesalers looking to discuss

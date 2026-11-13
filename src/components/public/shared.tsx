@@ -92,7 +92,8 @@ export function ProductCard({ product }: { product: PublicProduct }) {
           <Link href={`/products/${product.slug}`}>{product.name}</Link>
         </h3>
         <p className="mt-2 text-xs text-muted">
-          SKU {product.sku} · {product.packSize}
+          {product.sku ? `SKU ${product.sku} · ` : ""}
+          {product.packSize}
         </p>
         <p className="my-4 text-sm leading-6 text-muted">{product.summary}</p>
         <div className="flex flex-wrap gap-4">

@@ -58,6 +58,11 @@ try {
     ["/api/health/ready", 200],
     ["/api/v1/me", 401],
     ["/api/v1/admin/overview", 401],
+    ["/api/v1/me/cart", 401],
+    ["/api/v1/me/orders", 401],
+    ["/api/v1/payments/unknown/proof", 401],
+    ["/api/v1/admin/sales/orders", 401],
+    ["/api/v1/admin/sales/settings", 401],
   ]) {
     const response = await fetch(`${base}${path}`, {
       signal: AbortSignal.timeout(10000),
@@ -69,7 +74,7 @@ try {
     console.log(`PASS ${path} (${expected})`);
   }
   console.log(
-    "5 production smoke checks passed. No data was created or modified.",
+    "10 production smoke checks passed. No data was created or modified.",
   );
 } finally {
   if (!exited) {

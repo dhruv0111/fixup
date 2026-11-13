@@ -1,0 +1,24 @@
+# Phase 5 pre-implementation audit and plan
+
+13 November 2026. Reviewed the current repository and original PRD/previous reports, customer/dealer ownership and approval, explicit public variant selection, shared category pricing, Phase 4 ledger/GRN/adjustment locks and SQL guards, admin workspace, request/auth/audit helpers and tests. Prior uncommitted work is preserved.
+
+## Required architecture extension
+
+Phase 4's available stock is currently the sum of physical available-unit movements. It is unsuitable for checkout without a reservation layer: a physical adjustment/reversal could otherwise consume units promised to an order. Keep the immutable physical ledger; add variant reservations and append-only reservation events under the same stock advisory locks, and extend DB guards to prohibit physical on-hand falling below active reservations. On-hand is not deducted at checkout, proof upload or payment verification. Reservation consumption and dispatch remain explicitly unavailable in Phase 5.
+
+## Implementation sequence
+
+1. Add cart items, confirmed sales/payment settings, sales orders/line snapshots, reservations/events, payment submissions/private raster bytes, immutable receipt/refund records and customer-visible order history events, with additive migration and integrity constraints. Preserve QWIK parent/variant IDs.
+2. Reuse existing category price resolution. Carts hold variant/quantity and last-seen price; current prices are always resolved on the server. Checkout preview issues a signed review token bound to current cart/prices/category/charges/address/settings. Commit revalidates those values and stock under locks; changed prices require another review. Idempotent order creation prevents repeated reservations.
+3. Keep actual payment details, tax/delivery rules, reservation duration/near-expiry review window and cancellation policies unset until an authorized owner explicitly confirms them. No real payment or commercial values are invented or seeded. Confirmed settings permit explicit zero charges; no tax/delivery defaults are inferred.
+4. Secure proof upload: bounded PNG/JPEG/WebP only, actual image decoding and PNG re-encoding with pixel/size limits, metadata stripped, private PostgreSQL byte storage, owner/admin-only streaming with no-store/nosniff. No public uploads or image-optimizer URLs. Submissions keep history, request IDs, hashes and duplicate-reference flags; an image never marks an order paid.
+5. Admin verification requires explicit actual-bank-record attestation, reference, amount, notes and revision. Separate immutable payment records, globally unique canonical bank references and order locks prevent double credit. Partial/overpayments remain visible; overpayment needs recorded resolution. No gateway, bank API, automatic reconciliation, automatic refund or dealer credit account.
+6. Configured expiry is enforced by an idempotent authorized admin operation and a guarded operator CLI suitable for a future scheduler. Late/near-expiry proof is flagged; release/re-reservation requires explicit admin resolution and current stock. Paid active holds stop expiring; cancelled/expired holds never silently return. Manual refunds are recorded only with explicit bank-transfer confirmation and audit.
+7. Add customer cart/checkout/orders/proof/history and protected admin order/payment/settings pages using current workspace/forms. In-app order events provide notifications, with private admin notes excluded from customer DTOs. No claim of external email/WhatsApp delivery.
+8. Unit/API/concurrency/rollback/private-upload tests plus desktop/mobile complete workflow, all previous Phase 1–4 regressions, migrations/schema diff/recovery, TypeScript/lint/format, production build and local smoke. Document exact results/screenshots/limits and any intentionally updated placeholder assertions.
+
+New admin permissions: orders.manage and payments.verify for ADMIN/SUPER_ADMIN; payment/business-rule settings remain owner/SUPER_ADMIN-only. Customers/dealers can access only their own carts/orders/proofs. Admins cannot approve their own customer orders. Cancellation rules are configured and snapshotted; verified money is never silently refunded.
+
+Operational conventions: INR integer paise, variant pack units, explicit configured tax basis points and fixed delivery amount, bounded monetary totals, single inventory location. No default reservation duration, tax rate, delivery charge, bank information or cancellation entitlement is introduced. Private proof storage/backups require protected database access and appropriate production retention/encryption policies.
+
+No payment gateway, automatic UPI/bank reconciliation, automatic refunds, dispatch/courier/AWB, multi-warehouse, advanced ERP, production deployment or Phase 6. Final report will cover the requested 20 items after actual verification.

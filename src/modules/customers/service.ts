@@ -31,7 +31,8 @@ export async function readProfile(actor: Actor) {
 export async function updateProfile(actor: Actor, input: unknown) {
   const { name, ...data } = profileSchema.parse(input);
   return getDb().$transaction(async (tx) => {
-    if (name !== undefined) await tx.user.update({ where: { id: actor.id }, data: { name } });
+    if (name !== undefined)
+      await tx.user.update({ where: { id: actor.id }, data: { name } });
     const customer = await tx.customer.update({
       where: { id: customerId(actor), userId: actor.id },
       data,
@@ -52,9 +53,20 @@ export async function updateProfile(actor: Actor, input: unknown) {
 
 export async function deleteAddress(actor: Actor, id: string) {
   return getDb().$transaction(async (tx) => {
-    const result = await tx.address.deleteMany({ where: { id, customerId: customerId(actor) } });
-    if (result.count !== 1) throw new AppError(404, "NOT_FOUND", "Address not found.");
-    await recordAudit({ actorId: actor.id, action: "ADDRESS_DELETED", entityType: "Address", entityId: id }, tx);
+    const result = await tx.address.deleteMany({
+      where: { id, customerId: customerId(actor) },
+    });
+    if (result.count !== 1)
+      throw new AppError(404, "NOT_FOUND", "Address not found.");
+    await recordAudit(
+      {
+        actorId: actor.id,
+        action: "ADDRESS_DELETED",
+        entityType: "Address",
+        entityId: id,
+      },
+      tx,
+    );
     return { deleted: true };
   });
 }

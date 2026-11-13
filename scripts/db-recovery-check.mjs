@@ -61,7 +61,7 @@ const hash = (value) =>
   createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const identifier = (value) => `"${value.replaceAll('"', '""')}"`;
 
-async function schemaFingerprint(client) {
+async function schemaFingerprint(client, evidenceName) {
   const columns = await client.query(
     "SELECT table_name,column_name,data_type,udt_name,is_nullable,column_default,character_maximum_length,datetime_precision FROM information_schema.columns WHERE table_schema='public' ORDER BY table_name,ordinal_position",
   );
@@ -69,7 +69,9 @@ async function schemaFingerprint(client) {
     "SELECT t.typname,e.enumlabel,e.enumsortorder FROM pg_enum e JOIN pg_type t ON t.oid=e.enumtypid JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public' ORDER BY t.typname,e.enumsortorder",
   );
   const constraints = await client.query(
-    `SELECT c.relname, p.conname, pg_get_constraintdef(p.oid) AS definition FROM pg_constraint p JOIN pg_class c ON c.oid=p.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' ORDER BY c.relname, p.conname`,
+    // Pretty deparsing preserves precedence while normalizing redundant grouping
+    // introduced when BETWEEN is expanded and re-parsed by pg_restore.
+    `SELECT c.relname, p.conname, pg_get_constraintdef(p.oid, true) AS definition FROM pg_constraint p JOIN pg_class c ON c.oid=p.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' ORDER BY c.relname, p.conname`,
   );
   const indexes = await client.query(
     "SELECT tablename,indexname,indexdef FROM pg_indexes WHERE schemaname='public' ORDER BY tablename,indexname",
@@ -80,14 +82,28 @@ async function schemaFingerprint(client) {
   const routines = await client.query(
     "SELECT proname,pg_get_functiondef(p.oid) AS definition FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' ORDER BY proname",
   );
-  return hash({
+  const definition = {
     columns: columns.rows,
     enums: enums.rows,
     constraints: constraints.rows,
     indexes: indexes.rows,
     triggers: triggers.rows,
     routines: routines.rows,
-  });
+  };
+  if (evidenceName)
+    writeFileSync(
+      resolve(directory, evidenceName),
+      JSON.stringify(definition, null, 2),
+      { mode: 0o600 },
+    );
+  return hash(definition);
+}
+async function sequenceState(client) {
+  return (
+    await client.query(
+      "SELECT sequencename,start_value,min_value,max_value,increment_by,cycle,cache_size,last_value FROM pg_sequences WHERE schemaname='public' ORDER BY sequencename",
+    )
+  ).rows;
 }
 async function dataFingerprint(client) {
   const tables = await client.query(
@@ -96,7 +112,9 @@ async function dataFingerprint(client) {
   const result = {};
   for (const { tablename } of tables.rows) {
     const rows = await client.query(
-      `SELECT to_jsonb(t) AS row FROM ${identifier(tablename)} t ORDER BY id`,
+      // Tables may use a natural key (for example CategoryPriceList.category).
+      // Canonical JSON ordering also covers tables with composite primary keys.
+      `SELECT to_jsonb(t) AS row FROM ${identifier(tablename)} t ORDER BY to_jsonb(t)::text COLLATE "C"`,
     );
     result[tablename] = { count: rows.rowCount, sha256: hash(rows.rows) };
   }
@@ -119,7 +137,8 @@ try {
     await source.query("SELECT pg_export_snapshot() AS snapshot")
   ).rows[0].snapshot;
   const expectedData = await dataFingerprint(source);
-  const expectedSchema = await schemaFingerprint(source);
+  const expectedSequences = await sequenceState(source);
+  const expectedSchema = await schemaFingerprint(source, "source-schema.json");
   // Use the same database snapshot for fingerprinting and the backup itself.
   run(
     "pg_dump",
@@ -155,11 +174,21 @@ try {
   clients.push(restored);
   await restored.connect();
   const restoredData = await dataFingerprint(restored);
+  if (
+    JSON.stringify(await sequenceState(restored)) !==
+    JSON.stringify(expectedSequences)
+  )
+    throw new Error(
+      "Restored document number sequences differ from the source.",
+    );
   if (JSON.stringify(restoredData) !== JSON.stringify(expectedData))
     throw new Error(
       "Restored data fingerprints do not match the source snapshot.",
     );
-  if ((await schemaFingerprint(restored)) !== expectedSchema)
+  if (
+    (await schemaFingerprint(restored, "restored-schema.json")) !==
+    expectedSchema
+  )
     throw new Error(
       "Restored constraints, indexes, functions or triggers differ.",
     );
@@ -217,6 +246,7 @@ try {
     sourceDatabase: sourceName,
     migrations: migrations.rows.map((row) => row.migration_name),
     tables: expectedData,
+    sequences: expectedSequences,
     schemaSha256: expectedSchema,
     archiveSha256: createHash("sha256")
       .update(readFileSync(dump))

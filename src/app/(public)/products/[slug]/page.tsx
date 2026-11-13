@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: Props) {
     ...metadata,
     openGraph: {
       ...metadata.openGraph,
-      images: product.images.map((i) => ({ url: i.url, alt: i.alt })),
+      images: product.images.map((i) => ({ url: siteUrl(i.url), alt: i.alt })),
     },
   };
 }
@@ -46,7 +46,7 @@ export default async function ProductPage({ params }: Props) {
     brand: { "@type": "Brand", name: product.brand },
     url: siteUrl(`/products/${product.slug}`),
     ...(product.images.length
-      ? { image: product.images.map((i) => i.url) }
+      ? { image: product.images.map((i) => siteUrl(i.url)) }
       : {}),
   };
   return (
@@ -91,7 +91,8 @@ export default async function ProductPage({ params }: Props) {
             {product.name}
           </h1>
           <p className="mt-4 text-sm text-muted">
-            {product.sku ? `SKU: ${product.sku} · ` : ""}Pack size: {product.packSize}
+            {product.sku ? `SKU: ${product.sku} · ` : ""}Pack size:{" "}
+            {product.packSize}
           </p>
           <p className="body-copy">{product.summary}</p>
           <p className="mb-6 text-sm font-medium">
@@ -119,9 +120,86 @@ export default async function ProductPage({ params }: Props) {
           </p>
         </div>
       </div>
-      {product.variants.length > 0 && <section className="mt-12" aria-label="Available variants"><h2 className="text-2xl font-semibold">Available pack sizes</h2><div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{product.variants.map(v => <article key={v.id} className="overflow-hidden rounded-xl border border-line bg-white"><div className="relative aspect-[4/3] bg-white">{v.imageUrl ? <Image src={v.imageUrl} alt={v.imageAlt} fill sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 22vw" className="object-contain" /> : <p className="p-6 text-sm text-muted">Pack photograph awaited</p>}</div><div className="p-5"><h3 className="text-xl font-semibold">{v.packSize}</h3><p className="mt-2 text-sm">{v.name}</p>{v.sku && <p className="mt-2 text-xs">SKU: {v.sku}</p>}<p className="mt-3 text-xs text-muted">{v.representative ? `Representative imagery; not a photograph of the ${v.packSize} pack.` : "Supplied packaging photograph."}</p>{v.mrpPaise !== null && <p className="mt-3 text-sm">MRP: {new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(v.mrpPaise / 100)}</p>}<div className="mt-4"><WhatsAppLink number={site.whatsapp} message={productMessage({ name: product.name, sku: v.sku, packSize: v.packSize })} /></div></div></article>)}</div></section>}
-      <VariantPrices productId={product.id} targets={product.variants.length ? product.variants.map(v => ({ id: v.id, label: v.name, variant: true })) : [{ id: product.id, label: product.name, variant: false }]} />
-      {product.sourceNotes && <section className="info-panel mt-8"><h2 className="text-xl font-semibold">About the supplied packaging</h2><p className="mt-4 text-sm leading-7 text-muted">{product.sourceNotes}</p></section>}
+      {product.variants.length > 0 && (
+        <section className="mt-12" aria-label="Available variants">
+          <h2 className="text-2xl font-semibold">Available pack sizes</h2>
+          <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {product.variants.map((v) => (
+              <article
+                key={v.id}
+                className="overflow-hidden rounded-xl border border-line bg-white"
+              >
+                <div className="relative aspect-[4/3] bg-white">
+                  {v.imageUrl ? (
+                    <Image
+                      src={v.imageUrl}
+                      alt={v.imageAlt}
+                      fill
+                      sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 22vw"
+                      className="object-contain"
+                    />
+                  ) : (
+                    <p className="p-6 text-sm text-muted">
+                      Pack photograph awaited
+                    </p>
+                  )}
+                </div>
+                <div className="p-5">
+                  <h3 className="text-xl font-semibold">{v.packSize}</h3>
+                  <p className="mt-2 text-sm">{v.name}</p>
+                  {v.sku && <p className="mt-2 text-xs">SKU: {v.sku}</p>}
+                  <p className="mt-3 text-xs text-muted">
+                    {v.representative
+                      ? `Representative imagery; not a photograph of the ${v.packSize} pack.`
+                      : "Supplied packaging photograph."}
+                  </p>
+                  {v.mrpPaise !== null && (
+                    <p className="mt-3 text-sm">
+                      MRP:{" "}
+                      {new Intl.NumberFormat("en-IN", {
+                        style: "currency",
+                        currency: "INR",
+                      }).format(v.mrpPaise / 100)}
+                    </p>
+                  )}
+                  <div className="mt-4">
+                    <WhatsAppLink
+                      number={site.whatsapp}
+                      message={productMessage({
+                        name: product.name,
+                        sku: v.sku,
+                        packSize: v.packSize,
+                      })}
+                    />
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+      <VariantPrices
+        productId={product.id}
+        targets={
+          product.variants.length
+            ? product.variants.map((v) => ({
+                id: v.id,
+                label: v.name,
+                variant: true,
+              }))
+            : [{ id: product.id, label: product.name, variant: false }]
+        }
+      />
+      {product.sourceNotes && (
+        <section className="info-panel mt-8">
+          <h2 className="text-xl font-semibold">
+            About the supplied packaging
+          </h2>
+          <p className="mt-4 text-sm leading-7 text-muted">
+            {product.sourceNotes}
+          </p>
+        </section>
+      )}
       <div className="detail-sections">
         <section>
           <h2>Product description</h2>

@@ -1,6 +1,6 @@
-# FIXUP Phase 1 architecture
+# FIXUP application architecture
 
-Scope: one Next.js App Router application, Node.js runtime, TypeScript, Tailwind, PostgreSQL and Prisma. Phase 2 adds public catalogue/content and enquiry modules; see [Phase 2 contracts](phase-2-api.md). Prices, checkout, orders, inventory, quotations, payments and delivery management remain outside scope. The foundation decisions below remain applicable.
+Scope: one Next.js App Router application, Node.js runtime, TypeScript, Tailwind, PostgreSQL and Prisma. Phase 2 adds public catalogue/content and enquiry modules; see [Phase 2 contracts](phase-2-api.md). Phase 3 adds shared category selling prices and server-calculated estimates; Phase 4 adds supplier, purchasing, receiving and inventory management. Checkout, sales orders, commercial quotation workflows, payments and delivery management remain outside scope. See [Phase 3 contracts](phase-3-api.md). The foundation decisions below remain applicable.
 
 ## Boundaries
 
@@ -16,7 +16,7 @@ Scope: one Next.js App Router application, Node.js runtime, TypeScript, Tailwind
 - `src/server/http`: safe errors, bounded JSON parsing and same-origin mutation checks.
 - `tests`: real PostgreSQL/API integration and browser tests.
 
-The authorised catalogue/content and enquiry modules are now implemented. Future business folders remain reserved: pricing, quotations, checkout, orders, procurement, inventory, payments, delivery, returns and reporting. Public return policy content does not implement return management.
+The authorised catalogue/content and enquiry modules are now implemented. Shared category pricing and supplier/purchasing/inventory/reporting are now implemented. Future business folders remain reserved for commercial quotations, checkout, sales orders, payments, delivery and returns. Public return policy content does not implement return management.
 
 ## Authentication decision
 
@@ -65,3 +65,25 @@ No paid service was provisioned and no deployment is part of this phase. Configu
 Rate limiting defaults to one conservative shared bucket when no trusted proxy header is configured. In production select only a header the ingress overwrites. The application always replaces its internal x-fixup-client-ip header. An arbitrary forwarded header supplied by a browser must never be configured as trusted without an enforcing proxy.
 
 Audit records are append-only through the application. A database owner can still modify them; external tamper-evident storage is outside Phase 1. Reasons must not contain secrets.
+
+## Phase 3 extension
+
+Customer and dealer administration, versioned review/status changes, shared price-list/category assignment and product variants reuse the existing permissions and transactional audit boundary. ManagementEvent stores protected change snapshots; public catalogue selects explicit safe fields. Dealer prices require current approved status/category/role. Suspension continues to use the foundation session-revocation trigger. Product IDs and stable variant IDs remain ready for later order/inventory relationships; no stock records or order persistence are introduced. The forward MRP integrity migration rejects confirmed-without-amount values at the database boundary.
+
+## Phase 4 stock boundary
+
+See [the pre-implementation plan](phase-4-plan.md) and [operations/API contracts](phase-4-api.md). Supplier, PurchaseOrder/Line, GoodsReceipt/Line, StockLot, StockMovement, StockAdjustment and StockSetting extend the existing variant catalogue. Submitted purchase lines store historical product/supplier/rate/tax/discount snapshots independent of retail/dealer price lists.
+
+The stock ledger is the source of truth; no editable balance table exists. Variant advisory locks serialize changes. A database trigger verifies lot/variant source, nonnegative available/damaged quantities and previous/updated snapshots; movements/adjustments and transacted lot metadata are immutable. A ledger trigger projects PO received quantities. Receiving takes a PO lock before sorted variant locks, rechecks outstanding quantities and posts everything in one transaction. Persistent request IDs and unique receipt-line/type constraints prevent duplicate receipts/adjustments. Reversal appends compensating movements without deleting history.
+
+Admin/Super Admin have explicit supplier/purchasing/inventory permissions; reversal is Super Admin-only. Sales/customer/dealer roles have no internal inventory/cost access. Protected reports/CSV reuse the same authorization. Supplier/product/batch data is entered by admins, with no actual stock/rates/suppliers seeded. Inventory is single-location, variant-specific integer pack units, with optional supplied dates and thresholds. This Phase 4 boundary is extended by the separate Phase 5 reservation and sales modules below. Dispatch, supplier returns and warehouse transfers remain outside scope.
+
+## Phase 5 order and money boundary
+
+`modules/sales` reuses category eligibility, variant visibility, existing saved addresses, permissions, audit records and physical stock. Cart items identify variants and store last-seen server prices. Reviewed checkout uses an HMAC token bound to current amounts, account, address and terms. Checkout takes request/cart/dealer/settings locks, sorted variant stock locks, and share locks for current user/address/catalogue/pricing rows before revalidation and atomic snapshot/reservation/cart-clear writes. Integer paise totals and per-line tax rounding are bounded.
+
+On-hand usable stock is the physical ledger sum; reserved stock is the sum of ACTIVE reservations; available is on-hand minus reserved. Damaged units are separate. The same stock locks and database guards protect Phase 4 adjustments/GRN reversals from consuming promised units. Immutable reservation events support current and as-of inventory reports. Expiry/cancellation and payment verification share an order lock then sorted stock locks. Unverified/partial reservations expire under confirmed timing; timely fully verified funds hold stock pending review/dispatch. Late proof requires an explicit, stock-checked admin action. Consumption and dispatch remain prohibited.
+
+PaymentSubmission stores private original metadata plus stripped/re-encoded PNG bytes; PaymentRecord separately stores immutable actual bank-verified receipts and completed external refunds. Owner/admin authorization precedes private streaming; no public storage or image optimizer is used. Duplicate canonical references/image hashes flag review; globally unique actual bank reference and submission ID prevent duplicate credit. Current admin permissions and explicit bank-record attestation are mandatory; self-review is denied. Customer DTOs omit internal notes, verifier IDs and private byte data. Order timelines provide in-app status notifications only. Protected expiry operation and guarded CLI are available; scheduling is an operator task before launch.
+
+Two additive transactional Phase 5 migrations introduce nine models and the SO sequence, reservation/ledger guards, financial constraints, immutable historical snapshots and proof/review transition checks. No real payment settings, tax/cancellation defaults, sales orders or stock are seeded. PostgreSQL backups now include private financial evidence and need restricted access and owner-approved retention.

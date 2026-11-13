@@ -37,7 +37,18 @@ const select = {
   variants: {
     where: { active: true, published: true, contentApproved: true },
     orderBy: { createdAt: "asc" as const },
-    select: { id: true, name: true, packSize: true, sku: true, imageUrl: true, imageAlt: true, imageApproved: true, representative: true, mrpPaise: true, mrpConfirmed: true },
+    select: {
+      id: true,
+      name: true,
+      packSize: true,
+      sku: true,
+      imageUrl: true,
+      imageAlt: true,
+      imageApproved: true,
+      representative: true,
+      mrpPaise: true,
+      mrpConfirmed: true,
+    },
   },
   images: {
     where: { approved: true },
@@ -59,7 +70,14 @@ function queryProduct(slug: string) {
 function safeProduct(row: NonNullable<Row>) {
   return {
     ...row,
-    variants: row.variants.map(({ imageApproved, mrpConfirmed, ...v }) => ({ ...v, imageUrl: imageApproved && imageUrl.safeParse(v.imageUrl).success ? v.imageUrl : null, mrpPaise: mrpConfirmed ? v.mrpPaise : null })),
+    variants: row.variants.map(({ imageApproved, mrpConfirmed, ...v }) => ({
+      ...v,
+      imageUrl:
+        imageApproved && imageUrl.safeParse(v.imageUrl).success
+          ? v.imageUrl
+          : null,
+      mrpPaise: mrpConfirmed ? v.mrpPaise : null,
+    })),
     images: row.images.filter((i) => imageUrl.safeParse(i.url).success),
     documents: row.documents.filter(
       (d) => documentUrl.safeParse(d.publicUrl).success,
