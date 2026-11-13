@@ -22,22 +22,28 @@ enum DealerStatus {
   SUSPENDED
 }
 
+enum CustomerCategory {
+  RETAIL
+  APPROVED_DEALER
+}
+
 model User {
-  id            String    @id
-  name          String
-  email         String    @unique
-  emailVerified Boolean   @default(false)
-  image         String?
-  role          Role      @default(CUSTOMER)
-  active        Boolean   @default(true)
-  profileProvisionedAt DateTime? @db.Timestamptz(3)
-  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
-  updatedAt     DateTime  @updatedAt @db.Timestamptz(3)
-  sessions      Session[]
-  accounts      Account[]
-  customer      Customer?
-  auditLogs     AuditLog[]
-  dealerReviews DealerProfile[] @relation("DealerReviewer")
+  id                   String          @id
+  name                 String
+  email                String          @unique
+  emailVerified        Boolean         @default(false)
+  image                String?
+  role                 Role            @default(CUSTOMER)
+  active               Boolean         @default(true)
+  managementVersion    Int             @default(0)
+  profileProvisionedAt DateTime?       @db.Timestamptz(3)
+  createdAt            DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime        @updatedAt @db.Timestamptz(3)
+  sessions             Session[]
+  accounts             Account[]
+  customer             Customer?
+  auditLogs            AuditLog[]
+  dealerReviews        DealerProfile[] @relation("DealerReviewer")
 
   @@index([role, active])
 }
@@ -70,9 +76,9 @@ model Account {
   refreshTokenExpiresAt DateTime? @db.Timestamptz(3)
   scope                 String?
   password              String?
-  createdAt             DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt             DateTime @updatedAt @db.Timestamptz(3)
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt             DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime  @updatedAt @db.Timestamptz(3)
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([providerId, accountId])
   @@index([userId])
@@ -98,13 +104,14 @@ model RateLimit {
 }
 
 model Customer {
-  id           String   @id @default(cuid())
-  userId       String   @unique
+  id           String           @id @default(cuid())
+  userId       String           @unique
   businessName String?
   phone        String?
-  createdAt    DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
-  user         User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  category     CustomerCategory @default(RETAIL)
+  createdAt    DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime         @updatedAt @db.Timestamptz(3)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Restrict)
   addresses    Address[]
   dealer       DealerProfile?
 }
@@ -135,14 +142,22 @@ model DealerProfile {
   businessType   String?
   gstin          String?      @unique
   expectedVolume String?
+  phone          String       @default("")
+  email          String       @default("")
+  address        String       @default("")
+  city           String       @default("")
+  state          String       @default("")
+  postalCode     String       @default("")
+  message        String       @default("")
+  version        Int          @default(0)
   status         DealerStatus @default(PENDING)
   reviewedById   String?
-  reviewedAt     DateTime?     @db.Timestamptz(3)
+  reviewedAt     DateTime?    @db.Timestamptz(3)
   reviewReason   String?
-  createdAt      DateTime      @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime      @updatedAt @db.Timestamptz(3)
+  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime     @updatedAt @db.Timestamptz(3)
   customer       Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  reviewedBy     User?         @relation("DealerReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedBy     User?        @relation("DealerReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
 
   @@index([status, createdAt])
   @@index([reviewedById])
@@ -173,121 +188,205 @@ model BusinessSettings {
 }
 
 model Category {
-  id String @id @default(cuid())
-  name String
-  slug String @unique
-  description String @default("")
-  active Boolean @default(true)
-  isDemo Boolean @default(false)
-  products Product[]
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String    @default("")
+  active      Boolean   @default(true)
+  isDemo      Boolean   @default(false)
+  products    Product[]
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
 }
 
 model Product {
-  id String @id @default(cuid())
-  name String
-  slug String @unique
-  sku String @unique
-  brand String
-  packSize String
-  summary String
-  description String
-  active Boolean @default(true)
-  published Boolean @default(false)
-  featured Boolean @default(false)
-  isDemo Boolean @default(false)
-  contentApproved Boolean @default(false)
-  approvalReference String @default("")
-  applications String[] @default([])
-  materials String[] @default([])
-  specifications Json @default("[]")
-  storageInstructions String @default("")
-  availability String @default("ENQUIRE")
-  categoryId String
-  category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  images ProductImage[]
-  documents ProductDocument[]
-  enquiries Enquiry[]
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  id                  String            @id @default(cuid())
+  name                String
+  slug                String            @unique
+  sku                 String?           @unique
+  brand               String
+  packSize            String
+  summary             String
+  description         String
+  active              Boolean           @default(true)
+  published           Boolean           @default(false)
+  featured            Boolean           @default(false)
+  isDemo              Boolean           @default(false)
+  contentApproved     Boolean           @default(false)
+  approvalReference   String            @default("")
+  applications        String[]          @default([])
+  materials           String[]          @default([])
+  specifications      Json              @default("[]")
+  storageInstructions String            @default("")
+  availability        String            @default("ENQUIRE")
+  sourceNotes         String            @default("")
+  categoryId          String
+  category            Category          @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  images              ProductImage[]
+  documents           ProductDocument[]
+  enquiries           Enquiry[]
+  variants            ProductVariant[]
+  prices              PriceEntry[]
+  createdAt           DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime          @updatedAt @db.Timestamptz(3)
+
   @@index([active, published, isDemo])
   @@index([categoryId])
 }
 
+model ProductVariant {
+  id                String       @id @default(cuid())
+  productId         String
+  product           Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  name              String
+  packSize          String
+  sku               String?      @unique
+  active            Boolean      @default(true)
+  published         Boolean      @default(false)
+  contentApproved   Boolean      @default(false)
+  approvalReference String       @default("")
+  imageUrl          String?
+  imageAlt          String       @default("")
+  imageApproved     Boolean      @default(false)
+  representative    Boolean      @default(true)
+  mrpPaise          Int?
+  mrpConfirmed      Boolean      @default(false)
+  mrpReferencePaise Int?
+  mrpReferenceNote  String       @default("")
+  version           Int          @default(0)
+  prices            PriceEntry[]
+  createdAt         DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime     @updatedAt @db.Timestamptz(3)
+
+  @@unique([productId, packSize])
+  @@index([productId, active, published])
+}
+
+model PriceList {
+  id         String              @id @default(cuid())
+  name       String
+  currency   String              @default("INR")
+  active     Boolean             @default(false)
+  version    Int                 @default(0)
+  entries    PriceEntry[]
+  categories CategoryPriceList[]
+  createdAt  DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime            @updatedAt @db.Timestamptz(3)
+}
+
+model CategoryPriceList {
+  category    CustomerCategory @id
+  priceListId String?
+  priceList   PriceList?       @relation(fields: [priceListId], references: [id], onDelete: Restrict)
+  version     Int              @default(0)
+}
+
+model PriceEntry {
+  id          String          @id @default(cuid())
+  priceListId String
+  priceList   PriceList       @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  productId   String?
+  product     Product?        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variantId   String?
+  variant     ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  amountPaise Int
+
+  @@unique([priceListId, productId])
+  @@unique([priceListId, variantId])
+}
+
+// Administrative change history. Never returned from customer/public pricing APIs.
+model ManagementEvent {
+  id         String   @id @default(cuid())
+  actorId    String
+  entityType String
+  entityId   String
+  reason     String
+  before     Json
+  after      Json
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([entityType, entityId, createdAt])
+}
+
 model ProductImage {
-  id String @id @default(cuid())
+  id        String  @id @default(cuid())
   productId String
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  url String
-  alt String
-  approved Boolean @default(false)
-  sortOrder Int @default(0)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  alt       String
+  approved  Boolean @default(false)
+  sortOrder Int     @default(0)
+
   @@index([productId])
 }
 
 model ProductDocument {
-  id String @id @default(cuid())
-  productId String
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  title String
-  kind String
-  publicUrl String?
-  privateReference String @default("")
-  approved Boolean @default(false)
-  visibility String @default("PRIVATE")
+  id               String  @id @default(cuid())
+  productId        String
+  product          Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  title            String
+  kind             String
+  publicUrl        String?
+  privateReference String  @default("")
+  approved         Boolean @default(false)
+  visibility       String  @default("PRIVATE")
+
   @@index([productId])
 }
 
 model WebsiteContent {
-  id String @id @default("singleton")
-  phone String @default("")
-  whatsapp String @default("")
-  email String @default("")
-  address String @default("")
-  workingHours String @default("")
-  aboutText String @default("")
-  aboutApproved Boolean @default(false)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  id            String   @id @default("singleton")
+  phone         String   @default("")
+  whatsapp      String   @default("")
+  email         String   @default("")
+  address       String   @default("")
+  workingHours  String   @default("")
+  aboutText     String   @default("")
+  aboutApproved Boolean  @default(false)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
 }
 
 model Faq {
-  id String @id @default(cuid())
-  question String
-  answer String
-  published Boolean @default(false)
-  sortOrder Int @default(0)
+  id        String   @id @default(cuid())
+  question  String
+  answer    String
+  published Boolean  @default(false)
+  sortOrder Int      @default(0)
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 }
 
 model Policy {
-  id String @id
-  title String
-  body String
+  id        String   @id
+  title     String
+  body      String
+  approved  Boolean  @default(false)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 }
 
 model Enquiry {
-  id String @id @default(cuid())
-  requestId String @unique
+  id            String   @id @default(cuid())
+  requestId     String   @unique
   payloadDigest String
-  kind String
-  name String
-  businessName String @default("")
-  phone String
-  email String @default("")
-  address String @default("")
-  city String @default("")
-  postalCode String @default("")
-  businessType String @default("")
-  gstin String @default("")
-  quantity String @default("")
-  location String @default("")
-  message String @default("")
-  consentAt DateTime @default(now()) @db.Timestamptz(3)
-  productId String?
-  product Product? @relation(fields: [productId], references: [id], onDelete: Restrict)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  kind          String
+  name          String
+  businessName  String   @default("")
+  phone         String
+  email         String   @default("")
+  address       String   @default("")
+  city          String   @default("")
+  postalCode    String   @default("")
+  businessType  String   @default("")
+  gstin         String   @default("")
+  quantity      String   @default("")
+  location      String   @default("")
+  message       String   @default("")
+  consentAt     DateTime @default(now()) @db.Timestamptz(3)
+  productId     String?
+  product       Product? @relation(fields: [productId], references: [id], onDelete: Restrict)
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+
   @@index([kind, createdAt])
+  @@index([payloadDigest, createdAt])
 }

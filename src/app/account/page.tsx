@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getActor } from "@/server/permissions/service";
 import { SignOutButton } from "@/components/forms/session-actions";
 
@@ -15,6 +16,12 @@ export default async function AccountPage() {
       <p className="eyebrow">YOUR FIXUP</p>
       <h1 className="mt-4 text-4xl font-semibold tracking-tight">My account</h1>
       <p className="mt-3 text-muted">Welcome, {actor.name}.</p>
+      <nav aria-label="Account management" className="mt-6 flex flex-wrap gap-3">
+        <Link className="button button-secondary" href="/account/profile">Edit profile</Link>
+        <Link className="button button-secondary" href="/account/addresses">Delivery addresses</Link>
+        <Link className="button button-secondary" href="/account/dealer">Dealer application</Link>
+        <Link className="button button-secondary" href="/account/orders">Order history</Link>
+      </nav>
       <div className="mt-8 grid gap-6 md:grid-cols-2">
         <section className="rounded-2xl border border-line bg-white p-7">
           <h2 className="text-lg font-semibold">Your profile</h2>
@@ -56,7 +63,9 @@ export default async function AccountPage() {
         </section>
       </div>
       <p className="mt-7 text-sm text-muted">
-        Product browsing and ordering will be available in a later release.
+        <Link href="/products" className="text-link">
+          Explore the product catalogue →
+        </Link>
       </p>
     </main>
   );

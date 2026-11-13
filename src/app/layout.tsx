@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Navigation } from "@/components/layout/navigation";
+import { Footer } from "@/components/layout/footer";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -7,7 +8,8 @@ export const metadata: Metadata = {
     default: "FIXUP — Adhesives & Bonding Solutions",
     template: "%s | FIXUP",
   },
-  description: "The FIXUP account portal for customers and business partners.",
+  description:
+    "Adhesive sourcing and distribution for customers, hardware shops and business partners.",
   robots: { index: false, follow: false },
 };
 export const runtime = "nodejs";
@@ -26,12 +28,7 @@ export default function RootLayout({
         </a>
         <Navigation />
         {children}
-        <footer className="border-t border-line">
-          <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-3 px-5 py-7 text-xs text-muted sm:px-8">
-            <p>FIXUP · Adhesives & Bonding Solutions</p>
-            <p>Preview · Temporary branding</p>
-          </div>
-        </footer>
+        <Footer />
       </body>
     </html>
   );

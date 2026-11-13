@@ -43,6 +43,22 @@ export default async function AdminPage() {
       <p className="mt-3 text-muted">
         Account activity and access at a glance.
       </p>
+      <div className="mt-6 flex flex-wrap gap-4">
+        <Link className="button button-secondary" href="/admin/customers">Customers</Link>
+        <Link className="button button-secondary" href="/admin/dealers">Dealers</Link>
+        <Link className="button button-secondary" href="/admin/price-lists">Shared price lists</Link>
+        {actor.permissions.includes("catalogue.write") && <Link className="button button-secondary" href="/admin/products">Products & variants</Link>}
+        {actor.permissions.includes("enquiries.read") && (
+          <Link className="button button-secondary" href="/admin/enquiries">
+            Customer enquiries
+          </Link>
+        )}
+        {actor.permissions.includes("catalogue.write") && (
+          <Link className="button" href="/admin/content">
+            Edit website content
+          </Link>
+        )}
+      </div>
       <div className="my-8 grid gap-4 sm:grid-cols-3">
         {[
           ["Registered accounts", users],

@@ -1,6 +1,8 @@
-# FIXUP — Phase 1.1 hardened foundation
+# FIXUP — Public website and product catalogue
 
-Local-only Next.js application for FIXUP – Adhesives & Bonding Solutions. Implements authentication, customer identity, permissions, audit logging and basic responsive pages. No real product data, commerce features, paid services or production deployment.
+Local-only Next.js application for FIXUP – Adhesives & Bonding Solutions. Includes the Phase 1/1.1 authentication foundation and the Phase 2 public catalogue, enquiry forms, WhatsApp links, configurable content and SEO. No checkout, payments, inventory, orders, paid services or production deployment. Search indexing remains disabled pending launch approval.
+
+See [Phase 2 API and content operations](docs/phase-2-api.md), [implementation checklist](docs/phase-2-checklist.md) and [verification report](docs/phase-2.1-report.md). Product photos, actual brands, specifications and policy approval still require owner input. Development preview products are explicitly labelled and excluded in production.
 
 ## Requirements
 
@@ -94,14 +96,14 @@ SMTP support is implemented but requires an owner-selected provider and actual c
 
 ## Project map
 
-- `src/app`: homepage, login/register/recovery, protected account/admin, API routes, loading/error/not-found.
-- `src/components`: reusable navigation, auth layouts and forms.
-- `src/modules`: customer and settings business services/validation.
+- `src/app`: all public website pages, login/register/recovery, protected account/admin, API routes, loading/error/not-found.
+- `src/components`: reusable navigation/footer, product presentation, enquiry forms, content editor and auth layouts/forms.
+- `src/modules`: catalogue, content, enquiry, customer and settings services/validation.
 - `src/server`: authentication, database, permissions, audit, email and HTTP utilities.
 - `src/config`: validated environment configuration.
-- `prisma`: foundation schema and versioned migration.
+- `prisma`: foundation and public catalogue schema with additive versioned migrations.
 - `scripts`: local DB, health, admin bootstrap and guarded tests.
-- `tests`: PostgreSQL/API integration and desktop/mobile browser coverage.
+- `tests`: unit tests, PostgreSQL/API integration and desktop/mobile browser coverage. Run `npm run test:unit` and `npm test`.
 - `docs`: architecture, API and execution report.
 
 The full planned business-module structure is documented in `docs/architecture.md`. Reserved future folders contain only `.gitkeep` files; no later-phase code is stubbed into the runtime.

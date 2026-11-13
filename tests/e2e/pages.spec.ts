@@ -15,7 +15,7 @@ test("public pages, responsive navigation, recovery and not-found render", async
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Welcome to your FIXUP." }),
+    page.getByRole("heading", { name: "Strong Bond. Lasting Trust." }),
   ).toBeVisible();
   await expect(
     page.getByRole("navigation", { name: "Main navigation" }),

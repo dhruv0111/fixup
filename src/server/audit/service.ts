@@ -14,12 +14,35 @@ export type AuditAction =
   | "ROLE_CHANGED"
   | "CATALOGUE_UPDATED"
   | "CONTENT_UPDATED"
-  | "ENQUIRY_RECEIVED";
+  | "ENQUIRY_RECEIVED"
+  | "ADDRESS_DELETED"
+  | "ACCOUNT_STATUS_CHANGED"
+  | "DEALER_APPLIED"
+  | "DEALER_STATUS_CHANGED"
+  | "PRICE_LIST_CHANGED"
+  | "CATEGORY_PRICE_LIST_CHANGED"
+  | "VARIANT_CHANGED";
 
 type AuditEntry = {
   actorId: string | null;
   action: AuditAction;
-  entityType: "User" | "Session" | "Customer" | "Address" | "BusinessSettings" | "Product" | "Category" | "WebsiteContent" | "Faq" | "Policy" | "Enquiry";
+  entityType:
+    | "User"
+    | "Session"
+    | "Customer"
+    | "Address"
+    | "BusinessSettings"
+    | "Product"
+    | "Category"
+    | "WebsiteContent"
+    | "Faq"
+    | "Policy"
+    | "Enquiry"
+    | "DealerProfile"
+    | "PriceList"
+    | "CategoryPriceList"
+    | "ProductVariant";
+  // No account credentials or private documents belong in audit records.
   entityId: string;
   reason?: string;
 };

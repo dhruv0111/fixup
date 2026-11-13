@@ -1,6 +1,6 @@
 # FIXUP Phase 1 architecture
 
-Scope: one Next.js App Router application, Node.js runtime, TypeScript, Tailwind, PostgreSQL and Prisma. No products, prices, checkout, orders, inventory, quotations, payments or delivery modules are implemented.
+Scope: one Next.js App Router application, Node.js runtime, TypeScript, Tailwind, PostgreSQL and Prisma. Phase 2 adds public catalogue/content and enquiry modules; see [Phase 2 contracts](phase-2-api.md). Prices, checkout, orders, inventory, quotations, payments and delivery management remain outside scope. The foundation decisions below remain applicable.
 
 ## Boundaries
 
@@ -16,7 +16,7 @@ Scope: one Next.js App Router application, Node.js runtime, TypeScript, Tailwind
 - `src/server/http`: safe errors, bounded JSON parsing and same-origin mutation checks.
 - `tests`: real PostgreSQL/API integration and browser tests.
 
-Future business modules will be introduced when authorised. Their folders contain only `.gitkeep` files, with no services, routes or premature database tables: catalogue, pricing, enquiries, quotations, checkout, orders, procurement, inventory, payments, delivery, returns, reporting and content.
+The authorised catalogue/content and enquiry modules are now implemented. Future business folders remain reserved: pricing, quotations, checkout, orders, procurement, inventory, payments, delivery, returns and reporting. Public return policy content does not implement return management.
 
 ## Authentication decision
 

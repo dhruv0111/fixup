@@ -26,6 +26,7 @@
     "admin:promote": "tsx scripts/promote-admin.ts",
     "profiles:repair": "tsx scripts/repair-profiles.ts",
     "test": "node scripts/run-tests.mjs",
+    "test:unit": "node --import tsx --test tests/unit/*.test.ts",
     "test:e2e": "node scripts/run-tests.mjs",
     "test:production": "node scripts/production-smoke.mjs",
     "postinstall": "prisma generate"

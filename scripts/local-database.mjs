@@ -12,7 +12,15 @@ const command = process.argv[2] ?? "start";
 mkdirSync(local, { recursive: true, mode: 0o700 });
 
 function run(binary, args, env = process.env, allowFailure = false) {
-  const result = spawnSync(binary, args, { env, encoding: "utf8" });
+  const startingServer = binary === "pg_ctl" && args.includes("start");
+  const result = spawnSync(binary, args, {
+    env,
+    encoding: "utf8",
+    windowsHide: true,
+    // On Windows the server can inherit captured pipe handles and keep the
+    // synchronous parent waiting after pg_ctl exits. Server diagnostics go to -l.
+    ...(startingServer ? { stdio: "ignore" } : {}),
+  });
   if (result.error)
     throw new Error(`${binary} is required on PATH: ${result.error.message}`);
   if (result.status !== 0 && !allowFailure) {
@@ -56,7 +64,7 @@ if (!running) {
     "-l",
     resolve(local, "postgres.log"),
     "-o",
-    `-h 127.0.0.1 -p ${port} -k ${local}`,
+    `-h 127.0.0.1 -p ${port}${process.platform === "win32" ? "" : ` -k ${local}`}`,
     "-w",
     "start",
   ]);
