@@ -166,6 +166,9 @@ async function sources(
   const needed = (...k: string[]) => kind === "dashboard" || k.includes(kind);
   const expenseSearch = kind === "expenses" ? q.q : "";
   const where = orderFilter(q);
+  // Cashflow and submission methods can differ from the checkout selection.
+  // Keep entity/cohort filters, then match the actual record's method below.
+  const paymentOrderWhere = orderFilter({ ...q, method: "" });
   const orders = bounded(
     await tx.salesOrder.findMany({
       where: {
@@ -232,7 +235,7 @@ async function sources(
       where: {
         ...(!needed("payments") ? { id: { in: [] } } : {}),
         createdAt: { gte: r.start, lt: r.cutoff },
-        order: where,
+        order: paymentOrderWhere,
         ...(q.method ? { method: q.method } : {}),
       },
       select: {
@@ -260,7 +263,7 @@ async function sources(
       where: {
         ...(!needed("payments") ? { id: { in: [] } } : {}),
         createdAt: { gte: r.start, lt: r.cutoff },
-        order: where,
+        order: paymentOrderWhere,
         ...(q.method ? { method: q.method } : {}),
         ...(q.reviewStatus ? { status: q.reviewStatus } : {}),
       },

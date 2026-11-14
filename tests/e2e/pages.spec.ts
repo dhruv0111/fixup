@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { dummyCredentials, testIp, db } from "../fixtures/helpers";
+import { secureAccount } from "../fixtures/security";
 
 test.beforeEach(async ({ page }) => {
   await page.setExtraHTTPHeaders({ "x-test-client-ip": testIp() });
@@ -88,6 +89,11 @@ test("admin dashboard renders for a privileged dummy user", async ({
   await page.getByLabel("Password", { exact: true }).fill(data.password);
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page).toHaveURL(/\/account$/);
+  await secureAccount({
+    api: page.request,
+    credentials: data,
+    user: await db.user.findUniqueOrThrow({ where: { email: data.email } }),
+  });
   await db.user.update({
     where: { email: data.email },
     data: { role: "ADMIN" },

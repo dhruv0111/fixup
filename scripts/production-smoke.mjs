@@ -3,6 +3,7 @@ import { once } from "node:events";
 import { existsSync } from "node:fs";
 import { createServer } from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
+import { chromium } from "@playwright/test";
 
 if (!existsSync(".next/BUILD_ID"))
   throw new Error("Run npm run build before the production smoke check.");
@@ -52,9 +53,11 @@ try {
     await delay(500);
   }
   if (!ready) throw new Error("Production server did not become ready.");
-  for (const [path, expected] of [
+  const checks = [
     ["/", 200],
     ["/login", 200],
+    ["/two-factor", 200],
+    ["/account/security", 200],
     ["/api/health/ready", 200],
     ["/api/v1/me", 401],
     ["/api/v1/admin/overview", 401],
@@ -72,7 +75,23 @@ try {
     ["/api/v1/admin/reports/sales?format=csv", 401],
     ["/api/v1/admin/expenses/unknown", 401],
     ["/api/v1/expense-attachments/unknown", 401],
-  ]) {
+  ];
+  for (const [path, expected] of checks) {
+    if (path === "/account/security") {
+      // App Router streaming redirects are completed by the browser.
+      const browser = await chromium.launch();
+      try {
+        const page = await browser.newPage();
+        await page.goto(`${base}${path}`);
+        await page.waitForURL(`${base}/login`, { timeout: 10000 });
+        console.log(
+          "PASS /account/security (anonymous browser redirected to /login)",
+        );
+      } finally {
+        await browser.close();
+      }
+      continue;
+    }
     const response = await fetch(`${base}${path}`, {
       signal: AbortSignal.timeout(10000),
     });
@@ -83,7 +102,7 @@ try {
     console.log(`PASS ${path} (${expected})`);
   }
   console.log(
-    "19 production smoke checks passed. No data was created or modified.",
+    `${checks.length} production smoke checks passed. No data was created or modified.`,
   );
 } finally {
   if (!exited) {

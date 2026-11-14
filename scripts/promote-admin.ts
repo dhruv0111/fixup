@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { parseArgs } from "node:util";
-import { getDb } from "../src/server/db/client";
+import { getDb, createDatabaseClient } from "../src/server/db/client";
 import {
   promoteOwner,
   validatePromotionRequest,
@@ -29,7 +29,10 @@ const environment = {
 let db: ReturnType<typeof getDb> | undefined;
 try {
   validatePromotionRequest(request, environment);
-  db = getDb();
+  if (environment.appEnv === "production")
+    process.env.FIXUP_PROCESS_ROLE = "operator";
+  db =
+    environment.appEnv === "production" ? createDatabaseClient(true) : getDb();
   const changed = await promoteOwner(request, environment, db);
   console.log(
     changed

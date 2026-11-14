@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { expect, type APIRequestContext } from "@playwright/test";
 import { db, registered } from "./helpers";
 import { seedQwik } from "../../src/modules/catalogue/qwik";
+import { secureAccount } from "./security";
 export const application = {
   businessName: "QA Dealer Business",
   contactName: "QA Applicant",
@@ -18,6 +19,7 @@ export const application = {
 };
 export async function staff(role: "ADMIN" | "SUPER_ADMIN" = "SUPER_ADMIN") {
   const account = await registered();
+  await secureAccount(account);
   await db.user.update({ where: { id: account.user.id }, data: { role } });
   return account;
 }

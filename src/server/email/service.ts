@@ -5,12 +5,28 @@ import nodemailer from "nodemailer";
 import { getEnv } from "@/config/env";
 
 export async function sendPasswordRecovery(to: string, url: string) {
+  return sendAccountMail(
+    to,
+    "Reset your FIXUP password",
+    `Use this single-use link to reset your FIXUP password. It expires in 30 minutes.\n\n${url}\n\nIf you did not request this, ignore this message.`,
+  );
+}
+
+export async function sendEmailVerification(to: string, url: string) {
+  return sendAccountMail(
+    to,
+    "Verify your FIXUP email",
+    `Confirm ownership of your FIXUP email using this link. It expires in 30 minutes.\n\n${url}\n\nIf you did not request this, ignore this message.`,
+  );
+}
+
+async function sendAccountMail(to: string, subject: string, text: string) {
   const env = getEnv();
   const message = {
     from: env.MAIL_FROM,
     to,
-    subject: "Reset your FIXUP password",
-    text: `Use this single-use link to reset your FIXUP password. It expires in 30 minutes.\n\n${url}\n\nIf you did not request this, ignore this message.`,
+    subject,
+    text,
   };
   if (env.MAIL_MODE === "file") {
     if (env.APP_ENV === "production")

@@ -5,6 +5,7 @@ const schema = z.object({
     .string()
     .url()
     .refine((v) => /^postgres(ql)?:/.test(v)),
+  DATABASE_SSL_CA_FILE: z.string().optional(),
   BETTER_AUTH_SECRET: z
     .string()
     .min(32)
@@ -41,6 +42,21 @@ export function getEnv() {
     );
   }
   if (env.APP_ENV === "production") {
+    const dbUrl = new URL(env.DATABASE_URL);
+    if (
+      !["localhost", "127.0.0.1", "[::1]"].includes(dbUrl.hostname) &&
+      dbUrl.searchParams.get("sslmode") !== "verify-full"
+    )
+      throw new Error(
+        "Production remote database requires sslmode=verify-full.",
+      );
+    if (
+      process.env.FIXUP_ALLOW_PRIVILEGED_OPERATIONS === "1" &&
+      process.env.FIXUP_PROCESS_ROLE !== "operator"
+    )
+      throw new Error(
+        "Privileged operations must run in the dedicated operator process.",
+      );
     if (
       !env.BETTER_AUTH_URL.startsWith("https://") ||
       env.MAIL_MODE !== "smtp" ||

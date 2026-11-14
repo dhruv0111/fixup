@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
 import { test, expect } from "@playwright/test";
 import { db, context, registered } from "../fixtures/helpers";
 import { staff, submitDealer, decide } from "../fixtures/phase3";
@@ -299,7 +300,7 @@ for (const state of [
             version: { increment: 1 },
           },
         });
-      if (state === "missing reservation")
+      if (state === "missing reservation") {
         await db.salesOrderLine.create({
           data: {
             orderId: s.o.row.id,
@@ -313,6 +314,20 @@ for (const state of [
             taxPaise: 0,
           },
         });
+        await mkdir(".local/qa/integrity-fixtures", {
+          recursive: true,
+          mode: 0o700,
+        });
+        await writeFile(
+          `.local/qa/integrity-fixtures/${s.o.row.id}.json`,
+          JSON.stringify({
+            orderId: s.o.row.id,
+            source: "tests/integration/phase6.spec.ts#missing reservation",
+            marker: "QA unreserved line",
+          }),
+          { mode: 0o600, flag: "wx" },
+        );
+      }
     }
     const r = await owner.api.post(dispatchApi, {
       data: {

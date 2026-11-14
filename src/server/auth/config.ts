@@ -2,10 +2,15 @@ import "server-only";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError } from "better-auth/api";
+import { twoFactor } from "better-auth/plugins";
+import { accountSecurity } from "./security";
 import { getDb } from "@/server/db/client";
 import { getEnv } from "@/config/env";
 import { recordAudit } from "@/server/audit/service";
-import { sendPasswordRecovery } from "@/server/email/service";
+import {
+  sendPasswordRecovery,
+  sendEmailVerification,
+} from "@/server/email/service";
 import { provisionAfterRegistration } from "@/modules/identity/provisioning";
 
 function createAuth() {
@@ -16,6 +21,16 @@ function createAuth() {
     baseURL: env.BETTER_AUTH_URL,
     basePath: "/api/auth",
     secret: env.BETTER_AUTH_SECRET,
+    plugins: [
+      twoFactor({
+        issuer: "FIXUP",
+        skipVerificationOnEnable: false,
+        allowPasswordless: false,
+        twoFactorCookieMaxAge: 300,
+        backupCodeOptions: { storeBackupCodes: "encrypted" },
+      }),
+      accountSecurity(),
+    ],
     trustedOrigins: [env.BETTER_AUTH_URL],
     logger: {
       level: "error",
@@ -43,7 +58,31 @@ function createAuth() {
         });
       },
     },
+    emailVerification: {
+      sendOnSignUp: false,
+      sendOnSignIn: false,
+      autoSignInAfterVerification: false,
+      expiresIn: 1800,
+      sendVerificationEmail: async ({ user, url }) =>
+        sendEmailVerification(user.email, url),
+      afterEmailVerification: async (user) => {
+        await recordAudit({
+          actorId: user.id,
+          action: "EMAIL_VERIFIED",
+          entityType: "User",
+          entityId: user.id,
+        });
+      },
+    },
     session: {
+      additionalFields: {
+        mfaVerifiedAt: {
+          type: "date",
+          required: false,
+          input: false,
+          returned: false,
+        },
+      },
       expiresIn: 60 * 60 * 24 * 7,
       updateAge: 60 * 60 * 24,
       freshAge: 60 * 60,
@@ -69,6 +108,7 @@ function createAuth() {
         "/sign-in/email": { window: 60, max: 10 },
         "/sign-up/email": { window: 60, max: 5 },
         "/request-password-reset": { window: 60, max: 5 },
+        "/send-verification-email": { window: 60, max: 3 },
       },
     },
     advanced: {
@@ -114,6 +154,7 @@ function createAuth() {
               throw new APIError("FORBIDDEN", {
                 message: "Account access is unavailable.",
               });
+            return { data: { ...session, mfaVerifiedAt: null } };
           },
           after: async (session) => {
             await recordAudit({

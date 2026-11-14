@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { randomUUID } from "node:crypto";
+import { secureAccount } from "../fixtures/security";
 import { db, context, registered } from "../fixtures/helpers";
 import { staff, submitDealer, decide } from "../fixtures/phase3";
 import {
@@ -553,6 +554,7 @@ test("verification requires bank attestation; customer and promoted self-review 
   expect(
     (await b.api.post(`${sales}/payments/${s.id}`, { data })).status(),
   ).toBe(403);
+  await secureAccount(b);
   await db.user.update({ where: { id: b.user.id }, data: { role: "ADMIN" } });
   expect(
     (

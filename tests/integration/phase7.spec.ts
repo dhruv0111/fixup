@@ -29,6 +29,7 @@ import {
   put,
   review,
   checkout,
+  sales,
 } from "../fixtures/phase5";
 import {
   fixture,
@@ -449,6 +450,55 @@ test("UPI and bank collection filters use real verified PaymentRecord methods", 
   ).toBe(10000);
   await s.b.api.dispose();
 });
+test("collection method filters include actual transfers and refunds that differ from checkout intent", async () => {
+  const s = await knownCostScenario(owner.api, { dispatch: false });
+  try {
+    const q = { customerId: s.b.user.customer!.id };
+    // Checkout says UPI, but the customer actually pays this second order by bank.
+    const o = await checkout(s.b, s.f.variants[1].id, 1);
+    expect(o.row.paymentMethod).toBe("UPI");
+    expect((await upload(s.b.api, o.row.id, { method: "BANK" })).status()).toBe(
+      201,
+    );
+    expect(
+      amount(
+        await report(owner.api, "payments", { ...q, method: "BANK" }),
+        "underReview",
+      ),
+    ).toBe(1);
+    expect(
+      (await verify(owner.api, o.row.id, o.row.totalPaise)).response.status(),
+    ).toBe(200);
+    expect((await orderAction(owner.api, s.o.row.id, "CANCEL")).status()).toBe(
+      200,
+    );
+    expect(
+      (
+        await owner.api.post(`${sales}/refunds/${s.o.row.id}`, {
+          data: {
+            requestId: randomUUID(),
+            amountPaise: 5000,
+            method: "BANK",
+            bankReference: `QA${randomUUID()}`,
+            checkedBankRecord: true,
+            reason: "QA external bank refund against UPI receipt",
+            internalNotes: "Dummy external refund already checked",
+          },
+        })
+      ).status(),
+    ).toBe(200);
+    const bank = await report(owner.api, "payments", { ...q, method: "BANK" });
+    expect(amount(bank, "receipts")).toBe(o.row.totalPaise);
+    expect(amount(bank, "refunds")).toBe(5000);
+    expect(amount(bank, "netCollections")).toBe(o.row.totalPaise - 5000);
+    const upi = await report(owner.api, "payments", { ...q, method: "UPI" });
+    expect(amount(upi, "receipts")).toBe(s.o.row.totalPaise);
+    expect(amount(upi, "refunds")).toBe(0);
+  } finally {
+    await s.b.api.dispose();
+  }
+});
+
 test("PO commitments, received values and remaining quantities remain separate", async () => {
   const f = await fixture(owner.api);
   const p = await po(owner.api, f, 10);

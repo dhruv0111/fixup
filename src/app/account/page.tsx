@@ -74,6 +74,19 @@ export default async function AccountPage() {
             end your sessions on every device.
           </p>
           <SignOutButton all />
+          <Link
+            className="button button-secondary mt-4"
+            href="/account/security"
+          >
+            Verify email and authenticator
+          </Link>
+          {actor.security.privileged &&
+            !actor.permissions.includes("admin.access") && (
+              <p className="mt-4">
+                Administrator access is locked until account security
+                verification is complete.
+              </p>
+            )}
         </section>
       </div>
       <p className="mt-7 text-sm text-muted">

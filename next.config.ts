@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Isolated UX QA can coexist with the owner's running development server.
+  ...(process.env.APP_ENV === "test" &&
+  process.env.FIXUP_QA_DIST_DIR === ".next-ux"
+    ? { distDir: ".next-ux" }
+    : {}),
   // Next 16.4.6 can replay stale HMR versions from its persistent dev cache.
   // Keep Turbopack development but start each process with a fresh module graph.
   experimental: {

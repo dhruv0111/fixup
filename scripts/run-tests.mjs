@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { loadTestEnvironment } from "./lib/test-environment.mjs";
+import { evidenceArchive } from "./lib/test-evidence.mjs";
 
 const testEnv = loadTestEnvironment();
 const origin = new URL(testEnv.BETTER_AUTH_URL);
@@ -11,6 +12,20 @@ const env = {
   TRUSTED_IP_HEADER: "x-test-client-ip",
   NEXT_TELEMETRY_DISABLED: "1",
 };
+process.umask(0o077);
+const evidence = evidenceArchive();
+evidence.preserve("before");
+process.on("exit", () => {
+  try {
+    evidence.preserve("after");
+    console.log(`Private before/after test artifacts: ${evidence.root}/`);
+  } catch {
+    console.error(
+      "Test evidence preservation failed; inspect private artifacts before rerunning.",
+    );
+    process.exitCode = 1;
+  }
+});
 
 function run(args) {
   const result = spawnSync(process.execPath, args, { env, stdio: "inherit" });

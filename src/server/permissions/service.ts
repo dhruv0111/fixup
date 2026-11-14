@@ -3,6 +3,7 @@ import { getAuth } from "@/server/auth/config";
 import { getDb } from "@/server/db/client";
 import { AppError } from "@/server/http/errors";
 import { ensureCustomerProfile } from "@/modules/identity/provisioning";
+import { privileged, mfaFresh } from "@/server/auth/security";
 
 export type Permission =
   | "account.read"
@@ -123,10 +124,42 @@ export async function getActor(headers: Headers, repairProfile = true) {
     });
     if (!user?.active) return null;
   }
-  const permissions = [...(rolePermissions[user.role] ?? [])];
+  const security = await getDb().user.findUniqueOrThrow({
+    where: { id: user.id },
+    select: {
+      emailVerified: true,
+      twoFactorEnabled: true,
+      twoFactor: { select: { verified: true } },
+    },
+  });
+  const currentSession = await getDb().session.findUnique({
+    where: { id: session.session.id },
+    select: { mfaVerifiedAt: true },
+  });
+  const securityReady =
+    security.emailVerified &&
+    security.twoFactorEnabled &&
+    security.twoFactor?.verified === true &&
+    mfaFresh(currentSession?.mfaVerifiedAt);
+  const permissions = [
+    ...(privileged(user.role) && !securityReady
+      ? (["account.read", "account.update"] as const)
+      : (rolePermissions[user.role] ?? [])),
+  ];
   if (user.role === "DEALER" && user.customer?.dealer?.status === "APPROVED")
     permissions.push("dealer.access");
-  return { ...user, sessionId: session.session.id, permissions };
+  return {
+    ...user,
+    sessionId: session.session.id,
+    permissions,
+    security: {
+      emailVerified: security.emailVerified,
+      mfaEnabled:
+        security.twoFactorEnabled && security.twoFactor?.verified === true,
+      mfaVerified: mfaFresh(currentSession?.mfaVerifiedAt),
+      privileged: privileged(user.role),
+    },
+  };
 }
 
 export type Actor = NonNullable<Awaited<ReturnType<typeof getActor>>>;

@@ -28,6 +28,12 @@ const allowed = new Set([
   "revoke-other-sessions",
   "request-password-reset",
   "reset-password",
+  "send-verification-email",
+  "verify-email",
+  "two-factor/enable",
+  "two-factor/verify-totp",
+  "two-factor/verify-backup-code",
+  "two-factor/generate-backup-codes",
 ]);
 
 async function handler(request: Request) {

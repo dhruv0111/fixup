@@ -75,6 +75,15 @@ export async function promoteOwner(
       throw new Error(
         "Production promotion requires verified email and the exact confirmed user ID.",
       );
+    if (
+      environment.appEnv === "production" &&
+      (!user.twoFactorEnabled ||
+        !(await tx.twoFactor.findUnique({ where: { userId: user.id } }))
+          ?.verified)
+    )
+      throw new Error(
+        "Production promotion requires verified authenticator enrollment.",
+      );
     if (user.role === "SUPER_ADMIN") return false;
     await tx.user.update({
       where: { id: user.id },

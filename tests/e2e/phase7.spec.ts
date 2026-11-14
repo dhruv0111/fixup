@@ -30,7 +30,13 @@ async function capture(page: Page, info: TestInfo, name: string) {
 test("owner dashboard displays real KPI definitions, charts and business-date filters", async ({
   page,
 }, info) => {
+  test.setTimeout(90000);
   const s = await knownCostScenario(owner.api);
+  const started = Date.now();
+  const loaded = page.waitForResponse(
+    (r) => new URL(r.url()).pathname === "/api/v1/admin/reports/dashboard",
+    { timeout: 35000 },
+  );
   await page.goto("/admin/business");
   await expect(
     page.getByRole("heading", {
@@ -38,6 +44,11 @@ test("owner dashboard displays real KPI definitions, charts and business-date fi
       exact: true,
     }),
   ).toBeVisible();
+  expect((await loaded).status()).toBe(200);
+  info.annotations.push({
+    type: "dashboard-response-ms",
+    description: String(Date.now() - started),
+  });
   await expect(
     page.getByRole("heading", { name: "Orders created", exact: true }),
   ).toBeVisible();
@@ -197,10 +208,16 @@ test("expense forms create, edit, attach a private receipt and cancel without de
 test("operational admin sees restricted dashboard and customer cannot open financial pages", async ({
   page,
 }, info) => {
+  test.setTimeout(90000);
   const admin = await staff("ADMIN");
   await page.context().clearCookies();
   await page.context().addCookies((await admin.api.storageState()).cookies);
+  const loaded = page.waitForResponse(
+    (r) => new URL(r.url()).pathname === "/api/v1/admin/reports/dashboard",
+    { timeout: 35000 },
+  );
   await page.goto("/admin/business");
+  expect((await loaded).status()).toBe(200);
   await expect(
     page.getByText(
       "Valuation and estimated profitability require owner financial access.",

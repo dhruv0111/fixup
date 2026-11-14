@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import pg from "pg";
+import { secureAccount, verifyEmail, enrollMfa } from "../fixtures/security";
 import { context, db, dummyCredentials, registered } from "../fixtures/helpers";
 import {
   ensureCustomerProfile,
@@ -32,10 +33,22 @@ test("database tools reject unsafe targets and development/test aliases", () => 
       { cwd: directory, encoding: "utf8" },
     );
   try {
+    writeFileSync(
+      join(directory, ".env.test"),
+      "APP_ENV=test\nDATABASE_URL=private-malformed-test-secret\n",
+    );
+    const malformed = invoke();
+    expect(malformed.status).toBe(1);
+    expect(malformed.stderr).not.toContain("private-malformed-test-secret");
     for (const [appEnv, databaseUrl] of [
       ["production", "postgresql://127.0.0.1/fixup_test"],
       ["test", "postgresql://127.0.0.1/fixup_dev"],
       ["test", "postgresql://example.invalid/fixup_test"],
+      ["test", "postgresql://127.0.0.1/fixup_test?host=example.invalid"],
+      [
+        "test",
+        "postgresql://127.0.0.1/fixup_test?options=-c%20timezone=Asia%2FKolkata",
+      ],
     ]) {
       writeFileSync(
         join(directory, ".env.test"),
@@ -368,7 +381,9 @@ test("upgrade reconciliation revokes legacy suspended sessions with one audit pe
 });
 
 test("role demotion and dealer rejection affect existing sessions immediately", async () => {
-  const { api, user } = await registered();
+  const a = await registered();
+  const { api, user } = a;
+  await secureAccount(a);
   await db.user.update({ where: { id: user.id }, data: { role: "ADMIN" } });
   expect((await api.get("/api/v1/admin/overview")).status()).toBe(200);
   await db.user.update({ where: { id: user.id }, data: { role: "DEALER" } });
@@ -495,13 +510,14 @@ test("production promotion requires verified identity, exact ID and audit; repla
   await expect(promoteOwner(request, environment, db)).rejects.toThrow(
     "verified email",
   );
-  await db.user.update({
-    where: { id: user.id },
-    data: { emailVerified: true },
-  });
+  await verifyEmail(api, credentials.email);
   await expect(
     promoteOwner({ ...request, confirmUser: "wrong-id" }, environment, db),
   ).rejects.toThrow("exact confirmed user ID");
+  await expect(promoteOwner(request, environment, db)).rejects.toThrow(
+    "verified authenticator enrollment",
+  );
+  await enrollMfa(api, credentials.password);
   expect(await promoteOwner(request, environment, db)).toBe(true);
   expect(await promoteOwner(request, environment, db)).toBe(false);
   expect(await db.session.count({ where: { userId: user.id } })).toBe(0);

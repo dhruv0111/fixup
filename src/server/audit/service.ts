@@ -2,6 +2,8 @@ import type { Prisma } from "@/generated/prisma/client";
 import { getDb } from "@/server/db/client";
 
 export type AuditAction =
+  | "EMAIL_VERIFIED"
+  | "MFA_VERIFIED"
   | "USER_REGISTERED"
   | "SESSION_CREATED"
   | "SESSION_REVOKED"

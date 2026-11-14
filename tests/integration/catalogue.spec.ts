@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { secureAccount } from "../fixtures/security";
 import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { context, db, registered } from "../fixtures/helpers";
@@ -192,8 +193,10 @@ test("content and personal enquiries require current permissions and same origin
     401,
   );
   expect((await anonymous.get("/api/v1/admin/enquiries")).status()).toBe(401);
-  const { api, user } = await registered();
+  const a = await registered();
+  const { api, user } = a;
   expect((await api.get("/api/v1/admin/content/products")).status()).toBe(403);
+  await secureAccount(a);
   await db.user.update({ where: { id: user.id }, data: { role: "ADMIN" } });
   expect((await api.get("/api/v1/admin/enquiries")).status()).toBe(200);
   expect(
@@ -247,7 +250,9 @@ test("enquiry endpoint rejects cross-origin and oversized bodies", async () => {
 });
 
 test("owner can manage catalogue and draft policies without exposing unapproved content", async () => {
-  const { api, user } = await registered();
+  const a = await registered();
+  const { api, user } = a;
+  await secureAccount(a);
   await db.user.update({
     where: { id: user.id },
     data: { role: "SUPER_ADMIN" },
@@ -329,10 +334,15 @@ test("production catalogue suppresses development demo data", () => {
         BETTER_AUTH_URL: "https://127.0.0.1:3443",
         MAIL_MODE: "smtp",
         SMTP_HOST: "127.0.0.1",
+        // Satisfy production sender validation without sending any email.
+        MAIL_FROM: "FIXUP QA <recovery@fixup.test>",
       },
       encoding: "utf8",
       timeout: 30000,
     },
   );
   expect(result.status, result.stdout || "Catalogue probe failed").toBe(0);
+  expect(result.stdout).toContain(
+    "Production catalogue excludes demo products and categories.",
+  );
 });

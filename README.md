@@ -73,7 +73,7 @@ Register normally, then grant owner access to that existing account:
 npm run admin:promote -- you@example.com "Initial local business owner setup"
 ```
 
-This audited operator action revokes the account's existing sessions. Sign in again, then open `/admin`. Do not share operator/database access. No user can promote themselves through registration or an API.
+This audited operator action revokes the account's existing sessions. Sign in again, verify email and confirm authenticator enrollment at `/account/security`, then open `/admin`. Local verification messages stay in private local mail; no real external email is sent in file mode. Do not share operator/database access. No user can promote themselves through registration or an API.
 
 Local promotion is restricted to named loopback development/test databases. Production promotion is refused by default and requires a verified existing identity, explicit target confirmation and the [controlled operator procedure](docs/operations.md). Do not enable privileged operations in the web application's environment.
 

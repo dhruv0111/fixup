@@ -7,6 +7,19 @@ import { PrismaClient } from "../../src/generated/prisma/client";
 const database = new URL(process.env.DATABASE_URL ?? "http://invalid");
 if (
   process.env.APP_ENV !== "test" ||
+  [...database.searchParams.keys()].some((key) =>
+    [
+      "host",
+      "hostaddr",
+      "port",
+      "user",
+      "password",
+      "dbname",
+      "database",
+      "service",
+      "options",
+    ].includes(key),
+  ) ||
   !/^\/fixup_[a-z_]*test$/.test(database.pathname) ||
   !["localhost", "127.0.0.1"].includes(database.hostname)
 ) {

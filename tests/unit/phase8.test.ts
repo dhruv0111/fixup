@@ -76,3 +76,28 @@ test("invalid environment errors report field names without values", () => {
     /private-invalid-connection|private-secret-value/,
   );
 });
+
+test("production remote database and operator flags fail closed without leaking secrets", () => {
+  for (const DATABASE_URL of [
+    "postgresql://dummy:private@db.example/fixup",
+    "postgresql://dummy:private@db.example/fixup?sslmode=require",
+  ]) {
+    const r = validate({ DATABASE_URL });
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /sslmode=verify-full/);
+    assert.doesNotMatch(r.stderr, /dummy:private/);
+  }
+  assert.equal(
+    validate({
+      DATABASE_URL:
+        "postgresql://dummy:private@db.example/fixup?sslmode=verify-full",
+    }).status,
+    0,
+  );
+  const r = validate({
+    FIXUP_ALLOW_PRIVILEGED_OPERATIONS: "1",
+    FIXUP_PROCESS_ROLE: undefined,
+  });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /dedicated operator/);
+});

@@ -32,6 +32,7 @@ model User {
   name                 String
   email                String              @unique
   emailVerified        Boolean             @default(false)
+  twoFactorEnabled     Boolean             @default(false)
   image                String?
   role                 Role                @default(CUSTOMER)
   active               Boolean             @default(true)
@@ -47,23 +48,49 @@ model User {
   stockMovements       StockMovement[]
   paymentSubmissions   PaymentSubmission[]
   paymentRecords       PaymentRecord[]
+  twoFactor            TwoFactor?
 
   @@index([role, active])
 }
 
 model Session {
-  id        String   @id
-  token     String   @unique
-  expiresAt DateTime @db.Timestamptz(3)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
-  ipAddress String?
-  userAgent String?
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String    @id
+  token         String    @unique
+  expiresAt     DateTime  @db.Timestamptz(3)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(3)
+  ipAddress     String?
+  userAgent     String?
+  userId        String
+  mfaVerifiedAt DateTime? @db.Timestamptz(3)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+model TwoFactor {
+  id                      String       @id
+  userId                  String       @unique
+  user                    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  secret                  String
+  backupCodes             String
+  verified                Boolean      @default(false)
+  failedVerificationCount Int          @default(0)
+  lockedUntil             DateTime?    @db.Timestamptz(3)
+  usedCodes               MfaCodeUse[]
+}
+
+// Hashed replay evidence (checked for 120 seconds); raw codes are never stored.
+// Records are retained; this migration does not delete audit or test evidence.
+model MfaCodeUse {
+  id       String    @id @default(cuid())
+  factorId String
+  factor   TwoFactor @relation(fields: [factorId], references: [id], onDelete: Cascade)
+  digest   String
+  usedAt   DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([factorId, usedAt])
 }
 
 // Required by Better Auth: credential passwords are library-managed here, not in User.

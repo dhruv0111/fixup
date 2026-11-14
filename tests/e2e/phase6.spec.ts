@@ -177,6 +177,10 @@ test("courier failure, manual rebooking, private proof and return handling work 
           .courierService,
     )
     .toBe("QA rescheduled courier service");
+  // The DB commit can precede the browser's refreshed optimistic version.
+  await expect(
+    page.getByText("QA rescheduled courier service", { exact: true }),
+  ).toBeVisible();
   await update(page, "RESCHEDULE", {
     "Rescheduled delivery date": new Date(Date.now() + 86400000)
       .toISOString()

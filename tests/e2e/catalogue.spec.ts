@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { secureAccount } from "../fixtures/security";
 import { db, testIp, registered } from "../fixtures/helpers";
 import { catalogueFixture } from "../fixtures/catalogue";
 let fixture: Awaited<ReturnType<typeof catalogueFixture>>;
@@ -216,12 +217,15 @@ test("invalid form, FAQ publication, sitemap and indexing protections", async ({
 test("owner content editor publishes FAQs while ordinary accounts are denied", async ({
   page,
 }) => {
-  const { api, user } = await registered();
+  const a = await registered();
+  const { api, user } = a;
   await page.context().addCookies((await api.storageState()).cookies);
   await page.goto("/admin/content");
   await expect(
     page.getByRole("heading", { name: "Access restricted" }),
   ).toBeVisible();
+  await secureAccount(a);
+  await page.context().addCookies((await api.storageState()).cookies);
   await db.user.update({
     where: { id: user.id },
     data: { role: "SUPER_ADMIN" },

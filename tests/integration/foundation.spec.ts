@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { readdir, readFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
+import { secureAccount } from "../fixtures/security";
 import {
   context,
   db,
@@ -186,7 +187,9 @@ for (const role of [
   "SUPER_ADMIN",
 ] as const) {
   test(`${role} server-side permission matrix`, async () => {
-    const { api, user } = await registered();
+    const a = await registered();
+    const { api, user } = a;
+    if (role === "ADMIN" || role === "SUPER_ADMIN") await secureAccount(a);
     await db.user.update({ where: { id: user.id }, data: { role } });
     const expected = role === "ADMIN" || role === "SUPER_ADMIN" ? 200 : 403;
     expect((await api.get("/api/v1/admin/overview")).status()).toBe(expected);
@@ -510,6 +513,8 @@ test("local owner bootstrap promotes an existing dummy user and revokes sessions
       })
     ).status(),
   ).toBe(200);
+  expect((await api.get("/api/v1/admin/overview")).status()).toBe(403);
+  await secureAccount({ api, user, credentials });
   expect((await api.get("/api/v1/admin/overview")).status()).toBe(200);
   await api.dispose();
 });
