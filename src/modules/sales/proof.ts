@@ -51,7 +51,17 @@ export async function proofImage(file: File) {
     );
   }
 }
-export async function readProofForm(request: Request) {
+export async function readProofForm(
+  request: Request,
+  allowedFields = [
+    "requestId",
+    "method",
+    "reference",
+    "paidOn",
+    "remarks",
+    "file",
+  ],
+) {
   if (
     request.headers.get("origin") !== new URL(getEnv().BETTER_AUTH_URL).origin
   )
@@ -83,17 +93,7 @@ export async function readProofForm(request: Request) {
   }
   const fields: Record<string, unknown> = {};
   for (const [key, value] of form) {
-    if (
-      Object.hasOwn(fields, key) ||
-      ![
-        "requestId",
-        "method",
-        "reference",
-        "paidOn",
-        "remarks",
-        "file",
-      ].includes(key)
-    )
+    if (Object.hasOwn(fields, key) || !allowedFields.includes(key))
       throw new AppError(
         422,
         "INVALID_UPLOAD",

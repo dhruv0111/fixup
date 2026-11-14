@@ -85,3 +85,23 @@ Use a compatible PostgreSQL client and custom-format `pg_dump --format=custom --
 6. Switch the application's secret-managed database connection only after operational review, then monitor errors and retain the previous database for the agreed recovery window. Record actual data loss and elapsed restoration time. Perform a periodic restore drill (monthly is a starting recommendation) and after significant schema/hosting changes.
 
 External SMTP, real TLS termination, hosted backup scheduling, retention, encryption and production restoration remain unverified until the chosen environment exists.
+
+## Business reports and expenses
+
+Apply the two Phase 7 migrations before restarting. Prisma database sessions explicitly use UTC; the business timezone still controls calendar filters and the April-based financial year. No stored timestamps are shifted. Review any real historical records written under a former non-UTC session before relying on historical analytics. Use fresh sessions after restarting if an older local session expires.
+
+Super Admin can review `/admin/business` and all eleven reports. Admin receives operational reports and can manage expenses, but cannot access profitability or inventory cost values. Sales representatives have no new global financial permission. Enter actual expenses at `/admin/expenses/new`; edits and cancellations require reasons and preserve immutable revisions. Optional private image receipts are part of the database backup and require restricted retention/access. A cancellation is not deletion or a payment reversal.
+
+The owner approved recorded net purchase cost, excluding separately recorded tax. Cost snapshots are immutable, cannot be edited through reports, and remain missing where the original lot lacks a purchase source. Keep actual lot allocations accurate. Profitability is an estimate based on confirmed dispatches, not an accounting ledger or cash balance. Review returned shipments and missing costs before interpreting totals. Business-wide expenses are not allocated arbitrarily to filtered products/customers. See [formula, date and completeness definitions](phase-7-metrics.md) and [API limits](phase-7-api.md). Narrow filters if the service refuses an oversized source set; it never silently truncates totals.
+
+## Manual dispatch and delivery
+
+Use `/admin/dispatch` with an authorized ADMIN or SUPER_ADMIN account. The ready queue shows only currently eligible orders; blocked orders have reasons. Before confirming, check the actual bank-verified amount, customer eligibility, package count, delivery address, actual local assignee or courier/AWB/booking date, and every variant's selected physical lot quantities. Do not treat a payment screenshot as bank verification. Saving a draft or entering an AWB does not deduct stock.
+
+Confirmation commits full-order dispatch, reservation consumption and lot ledger deductions together. If a request loses its response, refresh the shipment or retry the same request; never create a replacement order or manually deduct again. Stale revisions require refresh. If actual selected lots no longer contain enough usable stock, revise draft allocations. No partial shipments are supported.
+
+Local staff/courier events are entered manually. Explicit delivered confirmation needs the actual date/time, recipient and confirmation source. Photographs/scanned PNG/JPEG/WebP documents are optional, private and bounded to 5 MiB/16 megapixels; PDFs are not supported. Share evidence with the relevant customer only when appropriate using the explicit upload-time checkbox. Upload does not confirm delivery. Preserve private proof access/backup/retention controls and restrict database/backup permissions.
+
+After a failed delivery, record the reason, correct assignment/courier arrangements, and explicitly reschedule with a supplied expected date. Return-to-sender requires a reference and never restores stock. Super Admin may record a correction note without changing balances, or record a separately inspected physical return with quantity, condition, receipt time/reference and reason. Good/damaged returns append to the original lot and cannot exceed the original dispatched allocation. No automatic refund, credit or order reopening occurs; full returns/refunds remain outside this module.
+
+Courier names/AWBs are manual, with duplicate checks per normalized courier. Use consistent carrier names. Configure a tracking URL only after confirming the courier's actual HTTPS format with one `{awb}` placeholder; no API/live tracking is connected. Customer order timelines are the notification channel, so do not claim email/SMS/WhatsApp delivery. See [dispatch API/limits](phase-6-api.md) and [execution report](phase-6-report.md).

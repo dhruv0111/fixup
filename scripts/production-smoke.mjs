@@ -63,6 +63,15 @@ try {
     ["/api/v1/payments/unknown/proof", 401],
     ["/api/v1/admin/sales/orders", 401],
     ["/api/v1/admin/sales/settings", 401],
+    ["/api/v1/admin/dispatch", 401],
+    ["/api/v1/admin/dispatch/unknown", 401],
+    ["/api/v1/me/orders/unknown/delivery", 401],
+    ["/api/v1/delivery-proofs/unknown", 401],
+    ["/api/v1/admin/reports/dashboard", 401],
+    ["/api/v1/admin/reports/profitability?format=csv", 401],
+    ["/api/v1/admin/reports/sales?format=csv", 401],
+    ["/api/v1/admin/expenses/unknown", 401],
+    ["/api/v1/expense-attachments/unknown", 401],
   ]) {
     const response = await fetch(`${base}${path}`, {
       signal: AbortSignal.timeout(10000),
@@ -74,7 +83,7 @@ try {
     console.log(`PASS ${path} (${expected})`);
   }
   console.log(
-    "10 production smoke checks passed. No data was created or modified.",
+    "19 production smoke checks passed. No data was created or modified.",
   );
 } finally {
   if (!exited) {

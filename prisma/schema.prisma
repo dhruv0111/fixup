@@ -530,16 +530,18 @@ model GoodsReceiptLine {
 }
 
 model StockLot {
-  id             String            @id @default(cuid())
-  variantId      String
-  variant        ProductVariant    @relation(fields: [variantId], references: [id], onDelete: Restrict)
-  receiptLineId  String?           @unique
-  receiptLine    GoodsReceiptLine? @relation(fields: [receiptLineId], references: [id], onDelete: Restrict)
-  batchNumber    String?
-  manufacturedAt DateTime?         @db.Date
-  expiresAt      DateTime?         @db.Date
-  createdAt      DateTime          @default(now()) @db.Timestamptz(3)
-  movements      StockMovement[]
+  id                  String               @id @default(cuid())
+  variantId           String
+  variant             ProductVariant       @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  receiptLineId       String?              @unique
+  receiptLine         GoodsReceiptLine?    @relation(fields: [receiptLineId], references: [id], onDelete: Restrict)
+  batchNumber         String?
+  manufacturedAt      DateTime?            @db.Date
+  expiresAt           DateTime?            @db.Date
+  createdAt           DateTime             @default(now()) @db.Timestamptz(3)
+  movements           StockMovement[]
+  dispatchAllocations DispatchAllocation[]
+  cost                LotCost?
 
   @@unique([id, variantId])
   @@index([variantId, expiresAt])
@@ -557,26 +559,30 @@ model StockAdjustment {
 }
 
 model StockMovement {
-  id              String            @id @default(cuid())
-  variantId       String
-  variant         ProductVariant    @relation(fields: [variantId], references: [id], onDelete: Restrict)
-  lotId           String
-  lot             StockLot          @relation(fields: [lotId, variantId], references: [id, variantId], onDelete: Restrict)
-  kind            String
-  availableDelta  Int
-  damagedDelta    Int               @default(0)
-  previousStock   Int               @default(0)
-  updatedStock    Int               @default(0)
-  previousDamaged Int               @default(0)
-  updatedDamaged  Int               @default(0)
-  receiptLineId   String?
-  receiptLine     GoodsReceiptLine? @relation(fields: [receiptLineId], references: [id], onDelete: Restrict)
-  adjustmentId    String?           @unique
-  adjustment      StockAdjustment?  @relation(fields: [adjustmentId], references: [id], onDelete: Restrict)
-  reason          String
-  actorId         String
-  actor           User              @relation(fields: [actorId], references: [id], onDelete: Restrict)
-  createdAt       DateTime          @default(now()) @db.Timestamptz(3)
+  id                   String              @id @default(cuid())
+  variantId            String
+  variant              ProductVariant      @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  lotId                String
+  lot                  StockLot            @relation(fields: [lotId, variantId], references: [id, variantId], onDelete: Restrict)
+  kind                 String
+  availableDelta       Int
+  damagedDelta         Int                 @default(0)
+  previousStock        Int                 @default(0)
+  updatedStock         Int                 @default(0)
+  previousDamaged      Int                 @default(0)
+  updatedDamaged       Int                 @default(0)
+  receiptLineId        String?
+  receiptLine          GoodsReceiptLine?   @relation(fields: [receiptLineId], references: [id], onDelete: Restrict)
+  adjustmentId         String?             @unique
+  adjustment           StockAdjustment?    @relation(fields: [adjustmentId], references: [id], onDelete: Restrict)
+  dispatchAllocationId String?             @unique
+  dispatchAllocation   DispatchAllocation? @relation(fields: [dispatchAllocationId], references: [id], onDelete: Restrict)
+  dispatchReturnId     String?             @unique
+  dispatchReturn       DispatchReturn?     @relation(fields: [dispatchReturnId], references: [id], onDelete: Restrict)
+  reason               String
+  actorId              String
+  actor                User                @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  createdAt            DateTime            @default(now()) @db.Timestamptz(3)
 
   @@unique([receiptLineId, kind])
   @@index([variantId, createdAt])
@@ -666,6 +672,7 @@ model SalesOrder {
   submissions            PaymentSubmission[]
   payments               PaymentRecord[]
   events                 SalesOrderEvent[]
+  dispatch               Dispatch?
 
   @@index([customerId, createdAt])
   @@index([status, paymentStatus, createdAt])
@@ -687,8 +694,210 @@ model SalesOrderLine {
   linePricePaise Int
   taxPaise       Int
   reservation    StockReservation?
+  dispatchLine   DispatchLine?
 
   @@unique([orderId, variantId])
+}
+
+model Dispatch {
+  id                 String          @id @default(cuid())
+  number             String          @unique @default(dbgenerated("('FIX-DSP-'::text || (nextval('fixup_dispatch_number'::regclass))::text)"))
+  orderId            String          @unique
+  order              SalesOrder      @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  requestId          String          @unique
+  payloadDigest      String
+  method             String
+  status             String          @default("DRAFT")
+  deliveryStatus     String          @default("PENDING")
+  packageCount       Int
+  scheduledDate      DateTime        @db.Date
+  expectedDate       DateTime?       @db.Date
+  personName         String          @default("")
+  personPhone        String          @default("")
+  vehicleNumber      String          @default("")
+  instructions       String          @default("")
+  courierName        String          @default("")
+  courierService     String          @default("")
+  awb                String          @default("")
+  awbKey             String?         @unique
+  bookingDate        DateTime?       @db.Date
+  shippingReference  String          @default("")
+  trackingTemplate   String          @default("")
+  internalRemarks    String          @default("")
+  version            Int             @default(0)
+  createdById        String
+  confirmedById      String?
+  confirmedAt        DateTime?       @db.Timestamptz(3)
+  deliveredAt        DateTime?       @db.Timestamptz(3)
+  recipientName      String          @default("")
+  confirmationSource String          @default("")
+  createdAt          DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime        @updatedAt @db.Timestamptz(3)
+  lines              DispatchLine[]
+  events             DeliveryEvent[]
+  proofs             DeliveryProof[]
+}
+
+model DispatchLine {
+  id          String               @id @default(cuid())
+  dispatchId  String
+  dispatch    Dispatch             @relation(fields: [dispatchId], references: [id], onDelete: Restrict)
+  orderLineId String               @unique
+  orderLine   SalesOrderLine       @relation(fields: [orderLineId], references: [id], onDelete: Restrict)
+  quantity    Int
+  allocations DispatchAllocation[]
+
+  @@unique([dispatchId, orderLineId])
+}
+
+model DispatchAllocation {
+  id             String           @id @default(cuid())
+  dispatchLineId String
+  line           DispatchLine     @relation(fields: [dispatchLineId], references: [id], onDelete: Restrict)
+  lotId          String
+  lot            StockLot         @relation(fields: [lotId], references: [id], onDelete: Restrict)
+  quantity       Int
+  movement       StockMovement?
+  returns        DispatchReturn[]
+  cost           DispatchCost?
+
+  @@unique([dispatchLineId, lotId])
+}
+
+// Approved recorded-lot method: integer rational net purchase cost, excluding separately recorded tax.
+model LotCost {
+  lotId            String   @id
+  lot              StockLot @relation(fields: [lotId], references: [id], onDelete: Restrict)
+  numeratorPaise   BigInt
+  denominatorUnits Int
+  source           String
+  sourceReference  String
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model DispatchCost {
+  allocationId     String             @id
+  allocation       DispatchAllocation @relation(fields: [allocationId], references: [id], onDelete: Restrict)
+  amountPaise      BigInt?
+  numeratorPaise   BigInt?
+  denominatorUnits Int?
+  source           String
+  createdAt        DateTime           @default(now()) @db.Timestamptz(3)
+}
+
+model BusinessExpense {
+  id            String              @id @default(cuid())
+  requestId     String              @unique
+  payloadDigest String
+  title         String
+  category      String
+  amountPaise   Int
+  expenseDate   DateTime            @db.Date
+  paymentMethod String
+  reference     String              @default("")
+  description   String              @default("")
+  status        String              @default("ACTIVE")
+  version       Int                 @default(0)
+  createdById   String
+  createdAt     DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime            @updatedAt @db.Timestamptz(3)
+  revisions     ExpenseRevision[]
+  attachments   ExpenseAttachment[]
+
+  @@index([expenseDate, category, status])
+}
+
+model ExpenseRevision {
+  id            String          @id @default(cuid())
+  expenseId     String
+  expense       BusinessExpense @relation(fields: [expenseId], references: [id], onDelete: Restrict)
+  version       Int
+  requestId     String          @unique
+  payloadDigest String
+  title         String
+  category      String
+  amountPaise   Int
+  expenseDate   DateTime        @db.Date
+  paymentMethod String
+  reference     String
+  description   String
+  status        String
+  actorId       String
+  reason        String
+  createdAt     DateTime        @default(now()) @db.Timestamptz(3)
+
+  @@unique([expenseId, version])
+  @@index([expenseDate, createdAt])
+}
+
+model ExpenseAttachment {
+  id           String          @id @default(cuid())
+  expenseId    String
+  expense      BusinessExpense @relation(fields: [expenseId], references: [id], onDelete: Restrict)
+  requestId    String          @unique
+  fileBytes    Bytes
+  fileHash     String
+  fileSize     Int
+  originalName String
+  uploadedById String
+  createdAt    DateTime        @default(now()) @db.Timestamptz(3)
+
+  @@index([expenseId])
+}
+
+model DeliveryEvent {
+  id              String   @id @default(cuid())
+  dispatchId      String
+  dispatch        Dispatch @relation(fields: [dispatchId], references: [id], onDelete: Restrict)
+  requestId       String   @unique
+  payloadDigest   String
+  kind            String
+  status          String
+  message         String
+  reason          String
+  internalRemarks String   @default("")
+  reference       String   @default("")
+  actorId         String
+  occurredAt      DateTime @db.Timestamptz(3)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([dispatchId, createdAt])
+}
+
+model DeliveryProof {
+  id                 String   @id @default(cuid())
+  dispatchId         String
+  dispatch           Dispatch @relation(fields: [dispatchId], references: [id], onDelete: Restrict)
+  requestId          String   @unique
+  fileBytes          Bytes
+  fileHash           String
+  fileSize           Int
+  mimeType           String
+  originalName       String
+  source             String
+  sharedWithCustomer Boolean  @default(false)
+  uploadedById       String
+  createdAt          DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([dispatchId])
+}
+
+model DispatchReturn {
+  id            String             @id @default(cuid())
+  allocationId  String
+  allocation    DispatchAllocation @relation(fields: [allocationId], references: [id], onDelete: Restrict)
+  requestId     String             @unique
+  payloadDigest String
+  quantity      Int
+  condition     String
+  reference     String
+  reason        String
+  receivedAt    DateTime           @db.Timestamptz(3)
+  actorId       String
+  createdAt     DateTime           @default(now()) @db.Timestamptz(3)
+  movement      StockMovement?
+
+  @@index([allocationId])
 }
 
 model StockReservation {

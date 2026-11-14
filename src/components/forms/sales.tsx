@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { DeliveryTracking } from "./dispatch";
 const money = (v: number) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(
     v / 100,
@@ -921,6 +922,16 @@ export function OrderView({
       <Message text={error} />
       {o && (
         <>
+          {admin ? (
+            <Link
+              href={`/admin/dispatch?q=${encodeURIComponent(o.number)}`}
+              className="text-link"
+            >
+              Manage dispatch & delivery
+            </Link>
+          ) : (
+            <DeliveryTracking orderId={o.id} />
+          )}
           <section className="info-panel">
             <h2 className="text-xl font-semibold">{o.number}</h2>
             <p className="my-3">
@@ -981,7 +992,9 @@ export function OrderView({
                   · {r.quantity} units · {r.status} ·{" "}
                   {r.expiresAt
                     ? new Date(r.expiresAt).toLocaleString()
-                    : "Held after full verified payment"}
+                    : r.status === "CONSUMED"
+                      ? "Dispatched"
+                      : "Held after full verified payment"}
                 </li>
               ))}
             </ul>
@@ -1056,7 +1069,9 @@ export function OrderView({
               </div>
             ))}
           </section>
-          <OrderActions order={o} admin={admin} reload={reload} />
+          {(admin || !o.reservations.some((r) => r.status === "CONSUMED")) && (
+            <OrderActions order={o} admin={admin} reload={reload} />
+          )}
           <section className="info-panel">
             <h2 className="text-xl font-semibold">Order status history</h2>
             <ul className="divide-y divide-line">

@@ -1,6 +1,6 @@
 # Phase 2.1 implementation checklist
 
-Source: supplied Phase 2 and Phase 2.1 briefs; repository audit. No separate original PRD was found in the checkout. Existing identity, authentication, authorization, audit and HTTP helpers will be reused.
+Source: supplied Phase 2 and Phase 2.1 briefs; repository audit. The separate original PRD is unavailable in this checkout's current attachments. Existing identity, authentication, authorization, audit and HTTP helpers are reused.
 
 - [x] Add additive catalogue/content/enquiry migration; verify fresh replay and repeat deployment without resetting existing data.
 - [x] Connect protected content management and public catalogue APIs.
@@ -19,12 +19,14 @@ Verified on 13 November 2026. See [completion report](phase-2.1-report.md) for e
 
 ## Remaining owner inputs and launch prerequisites
 
-- [ ] Supply actual product names/brands, SKUs, pack sizes, descriptions, availability and categories.
-- [ ] Supply authorised product photos and approved specifications, applications, materials, storage instructions and public TDS/SDS documents.
+- [x] Configure the supplied FIXUP QWIK parent product, Instant Adhesive / Super Glue category, four pack sizes and basic descriptions.
+- [x] Integrate both supplied QWIK images, with representative-image labels for sizes without actual pack photographs.
+- [ ] Supply actual SKUs, current commercial availability and approved technical descriptions/specifications, applications, materials, storage instructions and public TDS/SDS documents.
+- [ ] Supply individual 8g, 20g and 40g pack photographs if accurate per-size imagery is required.
 - [ ] Approve the company profile and all four legal/policy documents; confirm applicable business identity and commercial details.
 - [ ] Confirm operating days and any fuller postal address/PIN for publication.
 - [ ] Separately approve and configure a production launch, domain, indexing and the production controls documented in Phase 1.1.
 
-Business phone, WhatsApp, email, address and opening/closing times supplied during this task are configured. No application implementation or required local test remains blocked. The catalogue uses three labelled development samples until real products are supplied.
+Business phone, WhatsApp, email, address and opening/closing times supplied by the owner are configured. The real QWIK product and its four variants are published locally alongside labelled development samples; production catalogue queries exclude samples. Product/category/variant owner screens were added in Phase 3, extending the original protected Phase 2 APIs.
 
-No deployment or Phase 3 commerce features are authorized.
+This checklist describes Phase 2 only. Later phases now exist under separate user authorization; their implementation does not remove the Phase 2 requirements. No deployment or indexing change is authorized. See phase-2-current-audit.md for the latest verification and remaining content dependencies; the original completion report remains historical evidence.

@@ -50,6 +50,19 @@ export function getEnv() {
         "Production requires HTTPS and configured SMTP delivery.",
       );
     }
+    // The local example sender cannot deliver recovery mail in production.
+    // Validate one explicit mailbox; ownership/delivery still needs operator verification.
+    const mailbox =
+      env.MAIL_FROM.match(/^[^<>\r\n]*<([^<>\r\n]+)>$/)?.[1] ?? env.MAIL_FROM;
+    if (
+      !process.env.MAIL_FROM ||
+      !z.email().safeParse(mailbox).success ||
+      mailbox.toLowerCase().endsWith("@example.invalid")
+    ) {
+      throw new Error(
+        "Production requires an explicit valid MAIL_FROM sender.",
+      );
+    }
   }
   if (env.MAIL_MODE === "smtp" && !env.SMTP_HOST)
     throw new Error("SMTP_HOST is required for SMTP delivery.");

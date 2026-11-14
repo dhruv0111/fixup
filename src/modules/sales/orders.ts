@@ -347,6 +347,25 @@ export async function refresh(tx: Tx, id: string) {
   const allActive =
     row.reservations.length > 0 &&
     row.reservations.every((r) => r.status === "ACTIVE");
+  const dispatch = await tx.dispatch.findUnique({
+    where: { orderId: id },
+    select: { status: true, deliveryStatus: true },
+  });
+  if (dispatch?.status === "CONFIRMED") {
+    await tx.salesOrder.update({
+      where: { id },
+      data: {
+        paymentStatus,
+        status: ["DELIVERED", "DELIVERY_FAILED", "RETURNED"].includes(
+          dispatch.deliveryStatus,
+        )
+          ? dispatch.deliveryStatus
+          : "DISPATCHED",
+        version: { increment: 1 },
+      },
+    });
+    return load(tx, id);
+  }
   const pending = row.submissions.some((s) =>
     ["SUBMITTED", "UNDER_REVIEW"].includes(s.status),
   );

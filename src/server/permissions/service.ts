@@ -25,7 +25,12 @@ export type Permission =
   | "inventory.adjust"
   | "inventory.reverse"
   | "orders.manage"
-  | "payments.verify";
+  | "payments.verify"
+  | "dispatch.manage"
+  | "dispatch.correct"
+  | "reports.read"
+  | "reports.financial"
+  | "expenses.manage";
 // Management permissions remain separate from website publication permission.
 
 const rolePermissions: Record<string, readonly Permission[]> = {
@@ -33,6 +38,9 @@ const rolePermissions: Record<string, readonly Permission[]> = {
   DEALER: ["account.read", "account.update"],
   SALES_REP: ["account.read", "account.update", "leads.assigned"],
   ADMIN: [
+    "reports.read",
+    "expenses.manage",
+    "dispatch.manage",
     "orders.manage",
     "payments.verify",
     "suppliers.manage",
@@ -51,6 +59,11 @@ const rolePermissions: Record<string, readonly Permission[]> = {
     "settings.read",
   ],
   SUPER_ADMIN: [
+    "reports.read",
+    "reports.financial",
+    "expenses.manage",
+    "dispatch.manage",
+    "dispatch.correct",
     "orders.manage",
     "payments.verify",
     "suppliers.manage",

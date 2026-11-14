@@ -279,6 +279,10 @@ test("dealer applies and admin reviews, rejects, approves, suspends and reactiva
     await page.getByRole("button", { name: "Save changes" }).click();
     await expect(page.getByRole("status")).toContainText("Saved successfully");
     expect((await a.api.get("/api/v1/me")).status()).toBe(401);
+    // Fetch the saved account revision before submitting the opposite status.
+    // The success message precedes completion of router.refresh().
+    await page.reload();
+    await expect(page.getByLabel("Account active")).not.toBeChecked();
     await page.getByLabel("Account active").check();
     await page
       .getByLabel("Reason for change")

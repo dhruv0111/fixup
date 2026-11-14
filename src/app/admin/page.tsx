@@ -45,6 +45,27 @@ export default async function AdminPage() {
         Account activity and access at a glance.
       </p>
       <div className="mt-6 flex flex-wrap gap-4">
+        {actor.permissions.includes("reports.read") && (
+          <>
+            <Link className="button" href="/admin/business">
+              Business dashboard
+            </Link>
+            <Link className="button button-secondary" href="/admin/reports">
+              Reports & analytics
+            </Link>
+            <Link
+              className="button button-secondary"
+              href="/admin/expenses/new"
+            >
+              Record expense
+            </Link>
+          </>
+        )}
+        {actor.permissions.includes("dispatch.manage") && (
+          <Link className="button button-secondary" href="/admin/dispatch">
+            Dispatch & delivery
+          </Link>
+        )}
         <Link className="button button-secondary" href="/admin/sales/orders">
           Sales orders
         </Link>

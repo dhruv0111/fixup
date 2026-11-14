@@ -27,7 +27,9 @@ export type AuditAction =
   | "GOODS_RECEIPT_CHANGED"
   | "STOCK_ADJUSTED"
   | "STOCK_THRESHOLD_CHANGED"
-  | "SALES_CHANGED";
+  | "SALES_CHANGED"
+  | "DISPATCH_CHANGED"
+  | "EXPENSE_CHANGED";
 
 type AuditEntry = {
   actorId: string | null;
@@ -54,7 +56,9 @@ type AuditEntry = {
     | "StockAdjustment"
     | "StockSetting"
     | "SalesOrder"
-    | "SalesSettings";
+    | "SalesSettings"
+    | "Dispatch"
+    | "BusinessExpense";
   // No account credentials or private documents belong in audit records.
   entityId: string;
   reason?: string;

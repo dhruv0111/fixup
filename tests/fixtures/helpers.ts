@@ -13,7 +13,11 @@ if (
   throw new Error("Refusing to use a non-test database.");
 }
 export const db = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL, max: 3 }),
+  adapter: new PrismaPg({
+    connectionString: process.env.DATABASE_URL,
+    max: 3,
+    options: "-c timezone=UTC",
+  }),
 });
 export const origin = "http://127.0.0.1:3100";
 export function dummyCredentials() {

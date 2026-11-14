@@ -131,11 +131,11 @@ See [Phase 2 independent audit](docs/phase-2-final-audit.md), [Phase 3 API and f
 
 See [the implementation plan](docs/phase-4-plan.md), [API/operating rules](docs/phase-4-api.md), and [verification report](docs/phase-4-report.md). After `npm run db:migrate` and a dev-server restart, authorized admins can open Suppliers, Purchase Orders, Goods Receiving, Inventory, Ledger, Adjustments and Reports from `/admin`. Enter actual suppliers, rates and opening quantities through the protected forms; no supplier or inventory demo data is seeded into development or production. PO/GRN drafts do not create stock; confirmed GRNs and confirmed adjustments post immutable ledger entries.
 
-Inventory is single-location, in integer units per variant. Damaged stock is separate from available units; no reservations, sales orders, checkout, payment or dispatch are implemented. Super Admin reversal is limited to receipt lots that still have enough undamaged available stock. Reports and CSV exports remain protected.
+Inventory is single-location, in integer units per variant. Damaged stock is separate from available units. Phase 5 adds sales reservations and Phase 6 consumes them at dispatch confirmation. Super Admin reversal is limited to receipt lots that still have enough undamaged, unreserved available stock. Reports and CSV exports remain protected.
 
 ## Phase 5 sales and manual payment review
 
-Customer/dealer flow: product variant → shopping cart → reviewed checkout with saved address → Sales Order → stock reservation → direct UPI/bank transfer outside the website → private screenshot submission → admin checks the actual bank record → full verified payment and resolved exceptions → Ready for Dispatch. Physical stock is not deducted until a later dispatch phase.
+Customer/dealer flow: product variant → shopping cart → reviewed checkout with saved address → Sales Order → stock reservation → direct UPI/bank transfer outside the website → private screenshot submission → admin checks the actual bank record → full verified payment and resolved exceptions → Ready for Dispatch. Phase 6 adds dispatch confirmation and physical deduction, followed by delivery tracking.
 
 Use `/account/cart`, `/account/checkout`, `/account/orders` and order detail pages. Admins use `/admin/sales/orders` and `/admin/sales/payments`. Only Super Admin can configure `/admin/sales/settings`. Checkout stays disabled until the owner explicitly confirms actual payment details, tax mode/rate (zero allowed), delivery charge (zero allowed), reservation duration, near-expiry review window and cancellation rules. No real business banking data or invented policies are seeded.
 
@@ -147,4 +147,16 @@ Reservation cleanup is a protected admin action and trusted server command:
 npm run orders:expire -- --confirm-expire
 ```
 
-Run in the intended private server environment; each execution handles up to 100 orders. Repeat until zero. No automated scheduler is configured. [API contracts and operation notes](docs/phase-5-api.md), [pre-implementation audit/plan](docs/phase-5-plan.md), [execution report](docs/phase-5-report.md) and [screenshot index](docs/phase-5-screenshots.md) document behavior, verification and launch blockers. No dispatch, gateway, automatic reconciliation or automatic refunds are implemented.
+Run in the intended private server environment; each execution handles up to 100 orders. Repeat until zero. No automated scheduler is configured. [API contracts and operation notes](docs/phase-5-api.md), [pre-implementation audit/plan](docs/phase-5-plan.md), [execution report](docs/phase-5-report.md) and [screenshot index](docs/phase-5-screenshots.md) document behavior, verification and launch blockers. Gateway, automatic reconciliation and automatic refunds remain outside scope.
+
+## Phase 6 dispatch and delivery
+
+Admins use `/admin/dispatch` for ready/blocked orders, local deliveries, manual courier shipments, packing review, dispatch history, failed deliveries and status tracking. Confirmation is full-order only: enter actual packages/delivery details, allocate actual stock lots, review and confirm. The transaction consumes each reservation and deducts its allocated stock exactly once. Drafts do not deduct stock. Customers/dealers see only their own tracking inside order details. Courier/AWB information and delivery updates are manual; no paid API is connected.
+
+Private delivery photographs or scanned images are optional. Explicit delivery confirmation requires recipient, date/time and the real confirmation source. Failed/returned status alone does not restore inventory. Only Super Admin can record an inspected physical-return correction with bounded, auditable stock movements. [API](docs/phase-6-api.md), [plan](docs/phase-6-plan.md), [execution report](docs/phase-6-report.md) and [screenshots](docs/phase-6-screenshots.md) describe verification and limits.
+
+## Phase 7 business reports and expenses
+
+Open `/admin/business` for the dashboard and `/admin/reports` for sales, payments, purchases, suppliers, inventory, expenses, profitability estimates, deliveries, customers, dealers and products. Admins receive operational reports and expense management; only Super Admin receives financial valuation and profitability. CSV exports enforce the same permissions and filters. Expenses preserve reasoned revisions and cancellations, with optional private image receipts.
+
+The approved cost method freezes received lots at their recorded purchase rate after line discount, excluding separately recorded tax, then freezes actual allocated dispatch costs. Unsupported opening/correction stock stays cost missing; no selling-price fallback is used. Read [metric definitions](docs/phase-7-metrics.md), [API contracts](docs/phase-7-api.md), [execution report](docs/phase-7-report.md) and [screenshots](docs/phase-7-screenshots.md). Run migrations and restart after updating. No production deployment or Phase 8 is included.

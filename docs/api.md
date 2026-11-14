@@ -1,5 +1,7 @@
 # Phase 1 API contracts
 
+Later contracts: [Phase 7 reports, expenses and private attachments](phase-7-api.md), with [metric definitions and date bases](phase-7-metrics.md). These endpoints reuse the authentication, private caching and mutation guards below.
+
 All application APIs run on Node.js. Protected reads return `Cache-Control: private, no-store`. JSON mutation requests require an exact matching Origin and application/json content type; bodies are limited to 16 KiB. API success uses `{ data }`; application errors use `{ error: { code, message } }`. Better Auth uses its documented library response shapes.
 
 ## Public health
@@ -37,6 +39,8 @@ If identity creation succeeds but customer provisioning fails, signup still retu
 Another user's address is indistinguishable from a nonexistent address (404). Customer ownership is derived from the session and never accepted from a payload. There is no arbitrary user-ID customer endpoint.
 
 ## Permissions and administration
+
+Later module contracts: [public catalogue/enquiries](phase-2-api.md), [customer/dealer/pricing](phase-3-api.md), [inventory/purchasing](phase-4-api.md), [sales/manual payments](phase-5-api.md), and [dispatch/delivery](phase-6-api.md). The foundation endpoints below remain available; later contracts describe their extensions.
 
 - GET `/api/v1/dealer/access`: approval-gated capability check only; no pricing or dealer commerce.
 - GET `/api/v1/admin/overview`: ADMIN/SUPER_ADMIN account counts, pending dealer count and unexpired session count.
