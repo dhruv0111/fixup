@@ -35,14 +35,33 @@ test.afterAll(async () => {
 });
 async function record(page: Page, width: number, name: string) {
   await expect(page.locator("main h1")).toBeVisible();
+  if (stage === "after") {
+    await expect(
+      page
+        .getByRole("main")
+        .getByText(
+          /^Loading (cart|orders|payment submissions|order details|delivery addresses|recorded business activity|expense)/,
+        ),
+    ).toHaveCount(0, { timeout: 45000 });
+    for (const img of await page.locator("main img").all()) {
+      await img.scrollIntoViewIfNeeded();
+      await expect
+        .poll(() => img.evaluate((el) => (el as HTMLImageElement).naturalWidth))
+        .toBeGreaterThan(0);
+    }
+    await page.evaluate(() => scrollTo(0, 0));
+  }
   await page.addScriptTag({ content: axe });
   const accessibility = await page.evaluate<{
     violations: { id: string; impact: string; nodes: { target: string[] }[] }[];
     incomplete: { id: string }[];
   }>(
-    "async () => await axe.run(document.querySelector('main'), {runOnly: {type:'tag', values:['wcag2a','wcag2aa','wcag21aa','wcag22aa']}})",
+    "Promise.race([axe.run(document.querySelector('main'), {runOnly: {type:'tag', values:['wcag2a','wcag2aa','wcag21aa','wcag22aa']}}),new Promise(resolve=>setTimeout(()=>resolve({violations:[],incomplete:[{id:'audit-timeout-not-certified'}]}),15000))])",
   );
   const layout = await page.evaluate(() => ({
+    shortHeaderTargets: [
+      ...document.querySelectorAll(".site-header a:not(.brand-logo)"),
+    ].filter((el) => el.getBoundingClientRect().height < 44).length,
     overflow: document.documentElement.scrollWidth > innerWidth,
     width: innerWidth,
     scrollWidth: document.documentElement.scrollWidth,
@@ -72,16 +91,23 @@ async function record(page: Page, width: number, name: string) {
       width: el.getBoundingClientRect().width,
     })),
   }));
+  const documentHeight = await page.evaluate(
+    () => document.documentElement.scrollHeight,
+  );
+  const fullPage = documentHeight <= 8000;
   await page.screenshot({
     path: `${root}/${width}-${name}.png`,
-    fullPage: true,
+    fullPage,
+    scale: "css",
   });
+  const capture = { mode: fullPage ? "full-page" : "viewport", documentHeight };
   await appendFile(
     `${root}/observations.jsonl`,
     JSON.stringify({
       width,
       name,
       layout,
+      capture,
       violations: accessibility.violations.map((v) => ({
         id: v.id,
         impact: v.impact,
@@ -91,6 +117,23 @@ async function record(page: Page, width: number, name: string) {
     }) + "\n",
     { mode: 0o600 },
   );
+  if (stage === "after") {
+    expect(
+      layout.shortHeaderTargets,
+      `${width}px ${name}: header touch targets`,
+    ).toBe(0);
+    expect(layout.overflow, `${width}px ${name}: document overflow`).toBe(
+      false,
+    );
+    expect(
+      layout.unlabeled,
+      `${width}px ${name}: unlabeled form controls`,
+    ).toBe(0);
+    expect(
+      accessibility.violations,
+      `${width}px ${name}: axe violations`,
+    ).toEqual([]);
+  }
 }
 for (const [width, height] of [
   [375, 812],
@@ -159,6 +202,8 @@ for (const [width, height] of [
       prices: "/admin/price-lists",
       suppliers: "/admin/operations/suppliers",
       purchasing: "/admin/operations/purchase-orders",
+      purchaseNew: `/admin/operations/purchase-orders/new?q=${encodeURIComponent(f.supplier.name)}`,
+      priceNew: "/admin/price-lists/new?q=QWIK",
       grn: "/admin/operations/goods-receiving",
       inventory: "/admin/operations/inventory",
       ledger: "/admin/operations/stock-ledger",
@@ -185,6 +230,22 @@ for (const [width, height] of [
         await expect(
           page.getByRole("button", { name: "Record manual review" }),
         ).toBeVisible();
+      if (name === "inventory") {
+        const table = page.locator("[data-paginated-table]").first();
+        const first = table.locator("tbody tr").first().locator("td").first();
+        const original = await first.textContent();
+        await expect(
+          table.getByRole("button", { name: "Next records", exact: true }),
+        ).toBeEnabled();
+        await table
+          .getByRole("button", { name: "Next records", exact: true })
+          .click();
+        await expect(first).not.toHaveText(original!);
+        await table
+          .getByRole("button", { name: "Previous records", exact: true })
+          .click();
+        await expect(first).toHaveText(original!);
+      }
       await record(page, width, name);
     }
     info.annotations.push({ type: "ux-evidence", description: root });

@@ -63,7 +63,7 @@ export default async function Page({
   searchParams,
 }: {
   params: Promise<{ resource: string; id: string }>;
-  searchParams: Promise<{ purchaseOrderId?: string }>;
+  searchParams: Promise<{ purchaseOrderId?: string; q?: string | string[] }>;
 }) {
   const { resource, id } = await params;
   const actor = await pageActor("inventory.read");
@@ -126,10 +126,47 @@ export default async function Page({
   }
   if (resource === "purchase-orders") {
     if (id === "new") {
-      const choices = await options(actor);
+      const rawQuery = (await searchParams).q;
+      const invalidQuery =
+        rawQuery !== undefined &&
+        (typeof rawQuery !== "string" || rawQuery.length > 100);
+      const q =
+        typeof rawQuery === "string" && !invalidQuery ? rawQuery.trim() : "";
+      const choices = await options(actor, q);
       return (
         <Workspace admin title="Create purchase order">
           <OperationsNav />
+          <form
+            action="/admin/operations/purchase-orders/new"
+            className="info-panel flex flex-wrap items-end gap-4"
+          >
+            <label className="min-w-0 flex-1">
+              Find supplier by name
+              <input
+                name="q"
+                className="field mt-2"
+                maxLength={100}
+                defaultValue={q}
+                aria-describedby="supplier-search-help"
+              />
+            </label>
+            <button className="button" type="submit">
+              Find supplier
+            </button>
+            <p id="supplier-search-help" className="w-full text-sm text-muted">
+              Choose from up to 1,000 active suppliers. Search by name if an
+              item is not listed. Search before entering a draft: searching
+              reloads this form.
+            </p>
+            {invalidQuery && (
+              <p role="alert">
+                Enter a single search of at most 100 characters.
+              </p>
+            )}
+            {!choices.suppliers.length && (
+              <p role="status">No active suppliers match this search.</p>
+            )}
+          </form>
           <section className="info-panel">
             <PurchaseEditor {...choices} />
           </section>
@@ -196,7 +233,7 @@ export default async function Page({
               </summary>
               <div className="mt-6">
                 <PurchaseEditor
-                  {...await options(actor)}
+                  {...await options(actor, "", p.supplierId)}
                   initial={{
                     id: p.id,
                     requestId: p.requestId,

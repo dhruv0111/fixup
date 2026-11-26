@@ -8,7 +8,17 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { transition, statuses } from "@/modules/dispatch/rules";
+import {
+  transition,
+  statuses,
+  earliestEventTime,
+} from "@/modules/dispatch/rules";
+import {
+  orderStatus,
+  paymentStatus,
+  titleCase,
+} from "@/components/orders/status";
+import { StatusBadge } from "@/components/orders/ui";
 import type {
   dispatchDetail,
   queue,
@@ -79,12 +89,14 @@ function Field({
   type = "text",
   value,
   required = false,
+  min,
 }: {
   name: string;
   caption: string;
   type?: string;
   value?: string | number;
   required?: boolean;
+  min?: string | number;
 }) {
   return (
     <label className="block text-sm">
@@ -95,8 +107,10 @@ function Field({
         type={type}
         defaultValue={value}
         required={required}
-        min={type === "number" ? 1 : undefined}
+        min={min ?? (type === "number" ? 1 : undefined)}
         maxLength={1000}
+        minLength={name === "reason" ? 5 : undefined}
+        placeholder={name === "reason" ? "At least 5 characters" : undefined}
       />
     </label>
   );
@@ -457,7 +471,12 @@ export function DispatchQueue({
             ],
           ].map(([title, rows]) => (
             <section key={String(title)}>
-              <h2 className="mb-4 text-2xl font-semibold">{String(title)}</h2>
+              <h2 className="mb-4 text-xl font-semibold">
+                {String(title)}{" "}
+                <span className="status-badge status-gray align-middle">
+                  {(rows as typeof data.items).length}
+                </span>
+              </h2>
               <div className="grid gap-4 lg:grid-cols-2">
                 {(rows as typeof data.items).map((o) => (
                   <article className="info-panel" key={o.id}>
@@ -470,23 +489,28 @@ export function DispatchQueue({
                     <Summary values={o.customer} />
                     <p className="text-sm">
                       {new Date(o.createdAt).toLocaleString()} ·{" "}
-                      {label(o.paymentStatus)} · {o.productCount} variants ·{" "}
-                      {o.totalQuantity} units
+                      {o.productCount} variants · {o.totalQuantity} units
                     </p>
                     <Summary values={o.address} />
-                    <p className="my-3 text-sm">
-                      {label(o.status)} ·{" "}
-                      {o.dispatch
-                        ? `${o.dispatch.method} / ${label(o.dispatch.deliveryStatus)}`
-                        : "Delivery method not selected"}
-                    </p>
+                    <div className="my-3 flex flex-wrap items-center gap-2 text-sm">
+                      <StatusBadge {...orderStatus(o.status)} />
+                      <StatusBadge {...paymentStatus(o.paymentStatus)} />
+                      <span>
+                        {o.dispatch
+                          ? `${titleCase(o.dispatch.method)} · ${titleCase(o.dispatch.deliveryStatus)}`
+                          : "Delivery method not selected"}
+                      </span>
+                    </div>
                     {o.dispatch?.status !== "CONFIRMED" &&
                       o.reasons.length > 0 && (
-                        <ul className="my-4 list-disc pl-5 text-sm text-muted">
-                          {o.reasons.map((r) => (
-                            <li key={r}>{r}</li>
-                          ))}
-                        </ul>
+                        <div className="o-callout status-amber my-4">
+                          <strong>Blocked from dispatch</strong>
+                          <ul className="list-disc pl-5">
+                            {o.reasons.map((r) => (
+                              <li key={r}>{r}</li>
+                            ))}
+                          </ul>
+                        </div>
                       )}
                     {o.dispatch ? (
                       <Link
@@ -639,6 +663,14 @@ function Packing({ d, reload }: { d: Shipment; reload: () => Promise<void> }) {
   );
 }
 function Action({ d, reload }: { d: Shipment; reload: () => Promise<void> }) {
+  const earliest = earliestEventTime(d);
+  // The picker accepts minutes; round up so its first allowed minute is valid.
+  const minimumMinute = new Date(Math.ceil(earliest.getTime() / 60000) * 60000);
+  const localMinimum = new Date(
+    minimumMinute.getTime() - minimumMinute.getTimezoneOffset() * 60000,
+  )
+    .toISOString()
+    .slice(0, 16);
   const options =
     d.status === "DRAFT"
       ? ["CONFIRM"]
@@ -698,11 +730,20 @@ function Action({ d, reload }: { d: Shipment; reload: () => Promise<void> }) {
         </select>
       </label>
       {action !== "CONFIRM" && (
-        <Field
-          name="occurredAt"
-          caption="Actual event date and time (blank for now)"
-          type="datetime-local"
-        />
+        <>
+          <Field
+            name="occurredAt"
+            caption="Actual event date and time (blank for now)"
+            type="datetime-local"
+            min={localMinimum}
+          />
+          <p className="text-sm text-muted">
+            Use a time at or after{" "}
+            {earliest.toLocaleString(undefined, { timeZoneName: "short" })}.
+            Times are shown in your local timezone. Leave blank to record this
+            update now. Corrections add a new event to the shipment history.
+          </p>
+        </>
       )}
       {action === "DELIVERED" && (
         <>

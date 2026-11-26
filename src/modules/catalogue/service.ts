@@ -175,9 +175,19 @@ export async function getPolicy(slug: keyof typeof policyDrafts) {
     }
   );
 }
-export async function productOptions() {
+export async function productOptions(search = "") {
   return getDb().product.findMany({
-    where: publicProductWhere(),
+    where: {
+      ...publicProductWhere(),
+      ...(search
+        ? {
+            OR: [
+              { name: { contains: search, mode: "insensitive" as const } },
+              { sku: { contains: search, mode: "insensitive" as const } },
+            ],
+          }
+        : {}),
+    },
     select: { id: true, name: true, sku: true, isDemo: true },
     orderBy: { name: "asc" },
     take: 500,

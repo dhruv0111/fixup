@@ -1,4 +1,17 @@
 import { z } from "zod";
+export function earliestEventTime(shipment: {
+  createdAt: Date | string;
+  confirmedAt: Date | string | null;
+  events: { occurredAt: Date | string }[];
+}) {
+  return new Date(
+    Math.max(
+      new Date(shipment.createdAt).getTime(),
+      shipment.confirmedAt ? new Date(shipment.confirmedAt).getTime() : 0,
+      ...shipment.events.map((event) => new Date(event.occurredAt).getTime()),
+    ),
+  );
+}
 export function businessDate(now = new Date()) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata",

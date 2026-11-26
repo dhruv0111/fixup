@@ -163,26 +163,89 @@ export default async function Page({
       )}
       {totals && (
         <>
-          <div className="grid gap-4 sm:grid-cols-4">
-            {[
-              ["On-hand units", totals.onHand],
-              ["Reserved units", totals.reserved],
-              ["Available units", totals.available],
-              ["Damaged units", totals.damaged],
-              ["Low-stock variants", totals.low],
-              ["Out-of-stock variants", totals.out],
-            ].map(([name, n]) => (
-              <section key={name} className="info-panel">
-                <h2>{name}</h2>
-                <p className="mt-3 text-3xl font-semibold">{n}</p>
-              </section>
-            ))}
+          <div className="dash-cards" role="group" aria-label="Stock summary">
+            {(
+              [
+                [
+                  "On-hand units",
+                  totals.onHand,
+                  "Physical stock recorded",
+                  "gray",
+                  null,
+                ],
+                [
+                  "Reserved units",
+                  totals.reserved,
+                  "Held for unpaid or undispatched orders",
+                  "blue",
+                  null,
+                ],
+                [
+                  "Available units",
+                  totals.available,
+                  "On hand minus reserved",
+                  "green",
+                  null,
+                ],
+                [
+                  "Damaged units",
+                  totals.damaged,
+                  "Not available to sell",
+                  "gray",
+                  null,
+                ],
+                [
+                  "Low-stock variants",
+                  totals.low,
+                  "At or below the minimum",
+                  "amber",
+                  "?status=LOW",
+                ],
+                [
+                  "Out-of-stock variants",
+                  totals.out,
+                  "Nothing available",
+                  "red",
+                  "?status=OUT",
+                ],
+              ] as const
+            ).map(([name, n, hint, tone, href]) => {
+              const body = (
+                <>
+                  <span className="dash-card-top">
+                    {name}
+                    <span className={`status-badge status-${tone}`}>
+                      {tone === "gray"
+                        ? "Info"
+                        : tone === "green"
+                          ? "OK"
+                          : tone === "blue"
+                            ? "Held"
+                            : "Check"}
+                    </span>
+                  </span>
+                  <span className="dash-value">{n}</span>
+                  <span className="dash-hint">{hint}</span>
+                </>
+              );
+              return href && n > 0 ? (
+                <Link key={name} href={href} className="dash-card">
+                  {body}
+                </Link>
+              ) : (
+                <section key={name} className="dash-card">
+                  <h2 className="sr-only">{name}</h2>
+                  {body}
+                </section>
+              );
+            })}
           </div>
           <p className="text-sm text-muted">
             Total physical stock: {totals.onHand + totals.damaged} units. Counts
             are sums of recorded ledger entries; variants without movements have
-            no stock recorded. No stock is reserved. Thresholds are
-            admin-configured; no reorder quantity is assumed.
+            no stock recorded. Reservations reduce availability without
+            deducting physical stock. Thresholds are admin-configured; no
+            reorder quantity is assumed.
           </p>
           <h2 className="text-xl font-semibold">Current stock by product</h2>
           <DataTable

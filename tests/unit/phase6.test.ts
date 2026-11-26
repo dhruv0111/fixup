@@ -8,7 +8,28 @@ import {
   trackingUrl,
   awbKey,
   businessDate,
+  earliestEventTime,
 } from "../../src/modules/dispatch/rules";
+test("event times cannot precede shipment creation, confirmation or any recorded event", () => {
+  const shipment = {
+    createdAt: "2026-11-14T16:40:59.068Z",
+    confirmedAt: null as Date | string | null,
+    events: [] as { occurredAt: Date | string }[],
+  };
+  assert.equal(earliestEventTime(shipment).toISOString(), shipment.createdAt);
+  shipment.confirmedAt = new Date("2026-11-14T16:43:43.083Z");
+  assert.equal(
+    earliestEventTime(shipment).toISOString(),
+    shipment.confirmedAt.toISOString(),
+  );
+  shipment.events = [
+    { occurredAt: "2026-11-14T22:20:00+05:30" },
+    { occurredAt: new Date("2026-11-14T16:45:00Z") },
+  ];
+  const earliest = earliestEventTime(shipment);
+  assert.equal(earliest.toISOString(), "2026-11-14T16:50:00.000Z");
+  assert.ok(new Date("2026-11-13T18:55:00.000Z") < earliest);
+});
 test("date-only dispatch rules use the FIXUP India business date across UTC midnight", () => {
   assert.equal(businessDate(new Date("2026-11-13T18:29:00Z")), "2026-11-13");
   assert.equal(businessDate(new Date("2026-11-13T18:30:00Z")), "2026-11-14");

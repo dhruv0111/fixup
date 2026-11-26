@@ -7,7 +7,7 @@ import dotenv from "dotenv";
 const root = process.cwd();
 const local = resolve(root, ".local");
 const data = resolve(local, "postgres");
-const port = "55432";
+const port = "55433";
 const command = process.argv[2] ?? "start";
 mkdirSync(local, { recursive: true, mode: 0o700 });
 

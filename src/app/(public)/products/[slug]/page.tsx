@@ -103,8 +103,11 @@ export default async function ProductPage({ params }: Props) {
                 : "Enquire for availability"}
           </p>
           <div className="flex flex-wrap gap-3">
+            <Link className="button" href="#account-pricing">
+              Order / add to cart ↓
+            </Link>
             <Link
-              className="button"
+              className="button button-secondary"
               href={`/contact?product=${encodeURIComponent(product.slug)}`}
             >
               Enquire about this product ↗

@@ -11,8 +11,19 @@ export function generateMetadata() {
     "/bulk-orders",
   );
 }
-export default async function BulkPage() {
-  const [site, products] = await Promise.all([getWebsite(), productOptions()]);
+export default async function BulkPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string | string[] }>;
+}) {
+  const raw = (await searchParams).q;
+  const invalid =
+    raw !== undefined && (typeof raw !== "string" || raw.length > 100);
+  const query = typeof raw === "string" && !invalid ? raw.trim() : "";
+  const [site, products] = await Promise.all([
+    getWebsite(),
+    productOptions(query),
+  ]);
   return (
     <main id="main" className="container pb-20">
       <PageIntro
@@ -22,6 +33,35 @@ export default async function BulkPage() {
         Share your product, required quantity and delivery location to start a
         conversation.
       </PageIntro>
+      <form action="/bulk-orders" className="info-panel mb-6">
+        <label className="label" htmlFor="bulk-product-search">
+          Find product by name or SKU
+        </label>
+        <div className="flex flex-wrap items-end gap-3">
+          <input
+            id="bulk-product-search"
+            name="q"
+            className="field min-w-0 sm:flex-1"
+            defaultValue={query}
+            maxLength={100}
+            aria-describedby="bulk-product-search-hint"
+          />
+          <button className="button" type="submit">
+            Find product
+          </button>
+        </div>
+        <p id="bulk-product-search-hint" className="mt-3 text-sm text-muted">
+          Choose from up to 500 matching public products below. Search before
+          entering your enquiry; searching reloads this page and clears unsent
+          details.
+        </p>
+        {invalid && (
+          <p role="alert">Use one search of at most 100 characters.</p>
+        )}
+        {query && !products.length && (
+          <p role="status">No matching products. Try another name or SKU.</p>
+        )}
+      </form>
       <div className="editorial-grid">
         <EnquiryForm kind="BULK" token={challenge()} products={products} />
         <aside className="info-panel h-fit">

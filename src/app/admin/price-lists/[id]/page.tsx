@@ -4,11 +4,19 @@ import { PriceListEditor } from "@/components/forms/price-list-editor";
 import { getDb } from "@/server/db/client";
 export default async function Page({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ q?: string | string[] }>;
 }) {
   await pageActor("pricing.manage");
   const { id } = await params;
+  const rawQuery = (await searchParams).q;
+  const invalidQuery =
+    rawQuery !== undefined &&
+    (typeof rawQuery !== "string" || rawQuery.length > 100);
+  const q =
+    typeof rawQuery === "string" && !invalidQuery ? rawQuery.trim() : "";
   const db = getDb();
   const list =
     id === "new"
@@ -18,22 +26,73 @@ export default async function Page({
           include: { entries: true },
         });
   if (list === null) notFound();
-  const [products, events] = await Promise.all([
+  const productSelect = {
+    id: true,
+    name: true,
+    variants: { select: { id: true, name: true } },
+  } as const;
+  const [matches, savedProducts, events] = await Promise.all([
     db.product.findMany({
-      select: {
-        id: true,
-        name: true,
-        variants: { select: { id: true, name: true } },
-      },
+      where: q
+        ? {
+            OR: [
+              { name: { contains: q, mode: "insensitive" } },
+              { sku: { contains: q, mode: "insensitive" } },
+              {
+                variants: {
+                  some: {
+                    OR: [
+                      { name: { contains: q, mode: "insensitive" } },
+                      { sku: { contains: q, mode: "insensitive" } },
+                    ],
+                  },
+                },
+              },
+            ],
+          }
+        : {},
+      select: productSelect,
       orderBy: { name: "asc" },
-      take: 500,
+      take: 501,
     }),
+    list?.entries.length
+      ? db.product.findMany({
+          where: {
+            OR: [
+              {
+                id: {
+                  in: list.entries.flatMap((e) =>
+                    e.productId ? [e.productId] : [],
+                  ),
+                },
+              },
+              {
+                variants: {
+                  some: {
+                    id: {
+                      in: list.entries.flatMap((e) =>
+                        e.variantId ? [e.variantId] : [],
+                      ),
+                    },
+                  },
+                },
+              },
+            ],
+          },
+          select: productSelect,
+        })
+      : Promise.resolve([]),
     db.managementEvent.findMany({
       where: { entityType: "PriceList", entityId: id },
       orderBy: { createdAt: "desc" },
       take: 100,
     }),
   ]);
+  const products = [
+    ...new Map(
+      [...savedProducts, ...matches.slice(0, 500)].map((p) => [p.id, p]),
+    ).values(),
+  ];
   const targets = products.flatMap((p) =>
     p.variants.length
       ? p.variants.map((v) => ({
@@ -44,6 +103,37 @@ export default async function Page({
   );
   return (
     <Workspace admin title={list ? list.name : "Create price list"}>
+      <form
+        action={`/admin/price-lists/${id}`}
+        className="info-panel flex flex-wrap items-end gap-4"
+      >
+        <label className="min-w-0 flex-1">
+          Find product or variant
+          <input
+            className="field mt-2"
+            name="q"
+            maxLength={100}
+            defaultValue={q}
+            aria-describedby="price-search-help"
+          />
+        </label>
+        <button className="button" type="submit">
+          Find items
+        </button>
+        <p id="price-search-help" className="w-full text-sm text-muted">
+          Search by product name, variant name or SKU before editing. Searching
+          reloads this page; save price changes first. Items already saved in
+          this list remain available.
+        </p>
+        {invalidQuery && (
+          <p role="alert">Enter a single search of at most 100 characters.</p>
+        )}
+        <p className="w-full text-sm" role="status">
+          {matches.length > 500
+            ? "Showing the first 500 matching products. Refine your search to find other items."
+            : `${matches.length} matching products.`}
+        </p>
+      </form>
       <section className="info-panel">
         <PriceListEditor
           key={list?.version ?? "new"}

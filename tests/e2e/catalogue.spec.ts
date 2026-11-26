@@ -128,6 +128,17 @@ test("contact, bulk and dealer forms submit from the browser", async ({
     // Different clients avoid making this browser workflow a rate-limit test.
     await page.setExtraHTTPHeaders({ "x-test-client-ip": testIp() });
     await page.goto(`/${kind}`);
+    if (kind === "bulk-orders") {
+      await page
+        .getByLabel("Find product by name or SKU")
+        .fill(fixture.products[0].sku!);
+      await page
+        .getByRole("button", { name: "Find product", exact: true })
+        .click();
+      await expect(
+        page.getByLabel("Product *", { exact: true }).locator("option"),
+      ).toHaveCount(2);
+    }
     await page
       .getByLabel(
         kind === "become-a-dealer" ? "Contact person *" : "Your name *",

@@ -17,13 +17,22 @@ export function validTimezone(value: string) {
     return false;
   }
 }
+// Cache formatter configuration only, never dates, report rows or financial data.
+const dayFormatters = new Map<string, Intl.DateTimeFormat>();
 export function dayInZone(date: Date, timezone: string) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
+  let formatter = dayFormatters.get(timezone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    if (dayFormatters.size >= 32)
+      dayFormatters.delete(dayFormatters.keys().next().value!);
+    dayFormatters.set(timezone, formatter);
+  }
+  return formatter.format(date);
 }
 export function shiftDay(day: string, n: number) {
   const d = new Date(`${day}T12:00:00Z`);

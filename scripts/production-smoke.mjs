@@ -5,7 +5,11 @@ import { createServer } from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
 import { chromium } from "@playwright/test";
 
-if (!existsSync(".next/BUILD_ID"))
+const buildDirectory =
+  process.env.APP_ENV === "test" && process.env.FIXUP_QA_DIST_DIR === ".next-ux"
+    ? ".next-ux"
+    : ".next";
+if (!existsSync(`${buildDirectory}/BUILD_ID`))
   throw new Error("Run npm run build before the production smoke check.");
 const port = 3200;
 // Refuse to mistake someone else's running application for this build.

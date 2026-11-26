@@ -25,6 +25,7 @@ import {
   transition,
   trackingUrl,
   businessDate,
+  earliestEventTime,
 } from "./rules";
 
 const include = {
@@ -62,13 +63,19 @@ export async function loadDispatch(tx: Tx, id: string) {
   return d;
 }
 export type DispatchRecord = Awaited<ReturnType<typeof loadDispatch>>;
-export async function eligibility(tx: Tx, order: Order, allowDraft = true) {
+export function assessEligibility(
+  order: Order,
+  d: { id: string; status: string } | null,
+  customer: {
+    category: string;
+    user: { active: boolean; role: string };
+    dealer: { status: string } | null;
+  } | null,
+  allowDraft = true,
+  now = Date.now(),
+) {
   const reasons: string[] = [];
   const net = paymentBalance(order.payments);
-  const d = await tx.dispatch.findUnique({
-    where: { orderId: order.id },
-    select: { id: true, status: true },
-  });
   if (order.cancelledAt || order.status === "CANCELLED")
     reasons.push("Order is cancelled.");
   if (order.status === "RESERVATION_EXPIRED")
@@ -94,7 +101,6 @@ export async function eligibility(tx: Tx, order: Order, allowDraft = true) {
     reasons.push("A payment submission is still under review.");
   if (order.status !== "READY_FOR_DISPATCH")
     reasons.push("Order is not ready for dispatch.");
-  const now = Date.now();
   if (
     !order.lines.length ||
     order.reservations.length !== order.lines.length ||
@@ -113,13 +119,6 @@ export async function eligibility(tx: Tx, order: Order, allowDraft = true) {
     reasons.push(
       "Every order line needs a matching active, unexpired reservation.",
     );
-  const customer = await tx.customer.findUnique({
-    where: { id: order.customerId },
-    include: {
-      user: { select: { active: true, role: true } },
-      dealer: { select: { status: true } },
-    },
-  });
   if (
     !customer?.user.active ||
     !["CUSTOMER", "DEALER"].includes(customer.user.role) ||
@@ -135,6 +134,21 @@ export async function eligibility(tx: Tx, order: Order, allowDraft = true) {
     dispatchId: d?.id ?? null,
     verifiedPaise: net,
   };
+}
+export async function eligibility(tx: Tx, order: Order, allowDraft = true) {
+  const d = await tx.dispatch.findUnique({
+    where: { orderId: order.id },
+    select: { id: true, status: true },
+  });
+  const now = Date.now();
+  const customer = await tx.customer.findUnique({
+    where: { id: order.customerId },
+    include: {
+      user: { select: { active: true, role: true } },
+      dealer: { select: { status: true } },
+    },
+  });
+  return assessEligibility(order, d, customer, allowDraft, now);
 }
 async function requireEligible(tx: Tx, order: Order) {
   const check = await eligibility(tx, order);
@@ -417,14 +431,10 @@ export async function dispatchAction(actor: Actor, id: string, input: unknown) {
       if (data.action === "CONFIRM" && d.status === "CONFIRMED") return d;
       if (d.version !== data.version) throw conflict();
       const occurredAt = new Date(data.occurredAt);
-      if (
-        occurredAt < d.createdAt ||
-        (d.confirmedAt && occurredAt < d.confirmedAt) ||
-        (d.events.length &&
-          occurredAt < d.events[d.events.length - 1].occurredAt)
-      )
+      const earliest = earliestEventTime(d);
+      if (occurredAt < earliest)
         throw invalid(
-          "Event time cannot precede the shipment or its latest event.",
+          `Event time must be at or after ${earliest.toISOString()} (UTC), the shipment's latest event or creation time. Leave the event time blank in the form to record it now.`,
         );
       let next: string;
       const update: {

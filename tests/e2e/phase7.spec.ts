@@ -112,10 +112,26 @@ test("all centralized reports render, expose safe exports and support QWIK varia
       ].includes(kind)
     )
       await capture(page, info, `${kind}-report`);
-    if (kind === "products")
+    if (kind === "products") {
       await expect(
         page.getByRole("heading", { name: "FIXUP QWIK pack-size comparison" }),
       ).toBeVisible();
+      await expect(page.getByLabel("Product", { exact: true })).toHaveCount(0);
+      await page.getByText("More report filters", { exact: true }).click();
+      await page
+        .getByLabel("Product", { exact: true })
+        .selectOption(s.f.product.id);
+      await page.getByText("More report filters", { exact: true }).click();
+      await expect(page.getByLabel("Product", { exact: true })).toHaveValue(
+        s.f.product.id,
+      );
+      await page
+        .getByRole("button", { name: "Apply report filters", exact: true })
+        .click();
+      await expect(
+        page.getByRole("link", { name: "Export filtered CSV", exact: true }),
+      ).toHaveAttribute("href", new RegExp(`productId=${s.f.product.id}`));
+    }
   }
   await page.goto("/admin/reports/sales");
   await page

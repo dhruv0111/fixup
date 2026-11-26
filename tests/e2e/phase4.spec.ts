@@ -97,7 +97,9 @@ test("supplier form creates, edits, searches and retains product links", async (
     .getByLabel("Reason for change")
     .fill("QA browser deactivate supplier");
   await page.getByRole("button", { name: "Save supplier" }).click();
-  await expect(page.getByRole("status")).toContainText("Saved successfully");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Saved successfully" }),
+  ).toBeVisible();
   await page.reload();
   await expect(page.getByLabel("Supplier status")).toHaveValue("INACTIVE");
   await page.goto("/admin/operations/suppliers?status=INACTIVE");
@@ -111,6 +113,15 @@ test("purchase draft and partial goods receiving work from the browser", async (
   page,
 }, info) => {
   await page.goto("/admin/operations/purchase-orders/new");
+  await page
+    .getByLabel("Find supplier by name", { exact: true })
+    .fill(f.supplier.name);
+  await page
+    .getByRole("button", { name: "Find supplier", exact: true })
+    .click();
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get("q"))
+    .toBe(f.supplier.name);
   await page
     .getByLabel("Supplier", { exact: true })
     .selectOption(f.supplier.id);
@@ -142,6 +153,11 @@ test("purchase draft and partial goods receiving work from the browser", async (
   ).toBeVisible();
   await expect(page.getByText("Total: ₹175.00", { exact: true })).toBeVisible();
   expect((await balance(f.variants[0].id)).available).toBe(0);
+  await page.getByText("Edit PO draft", { exact: true }).click();
+  await expect(page.getByLabel("Supplier", { exact: true })).toHaveValue(
+    f.supplier.id,
+  );
+  await page.getByText("Edit PO draft", { exact: true }).click();
   await capture(page, info, "purchase-order");
   await confirm(page, "Submit purchase order");
   await expect(

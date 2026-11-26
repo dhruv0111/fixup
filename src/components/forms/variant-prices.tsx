@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AddCart } from "./sales";
 export function VariantPrices({
@@ -50,12 +50,19 @@ export function VariantPrices({
       setBusy(false);
     }
   }
+  useEffect(() => {
+    // Load the signed-in customer's prices once so Add to cart is visible immediately.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productId]);
   return (
-    <section className="info-panel mt-8">
-      <h2 className="text-xl font-semibold">Account pricing</h2>
+    <section id="account-pricing" className="info-panel mt-8 scroll-mt-24">
+      <h2 className="text-xl font-semibold">Order & account pricing</h2>
       <p className="my-3 text-sm text-muted">
-        Sign in to view your shared category prices. Contact FIXUP for unlisted
-        prices.
+        Sign in to compare pack sizes and your prices, then add items to your
+        cart. Approved, active dealers see their dealer prices. Contact FIXUP
+        for unlisted prices.
       </p>
       <button
         disabled={busy}

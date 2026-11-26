@@ -26,6 +26,19 @@ export default async function ContactPage({
     productOptions(),
     typeof query.product === "string" ? getPublicProduct(query.product) : null,
   ]);
+  // Keep a directly requested public product even outside the bounded choices.
+  const choices =
+    selected && !products.some((product) => product.id === selected.id)
+      ? [
+          {
+            id: selected.id,
+            name: selected.name,
+            sku: selected.sku,
+            isDemo: selected.isDemo,
+          },
+          ...products,
+        ]
+      : products;
   return (
     <main id="main" className="container pb-20">
       <PageIntro eyebrow="CONTACT FIXUP" title="Let’s make a connection.">
@@ -36,7 +49,7 @@ export default async function ContactPage({
         <EnquiryForm
           kind="CONTACT"
           token={challenge()}
-          products={products}
+          products={choices}
           selectedProduct={selected?.id}
         />
         <aside className="info-panel h-fit">

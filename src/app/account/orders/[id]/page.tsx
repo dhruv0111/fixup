@@ -1,6 +1,6 @@
 import { pageActor, Workspace } from "@/components/management/shared";
 import { OrderView } from "@/components/forms/sales";
-export const metadata = { title: "Sales order" };
+export const metadata = { title: "Order details" };
 export default async function Page({
   params,
 }: {
@@ -8,7 +8,7 @@ export default async function Page({
 }) {
   await pageActor("account.read");
   return (
-    <Workspace title="Sales order" admin={false}>
+    <Workspace title="Order details" admin={false}>
       <OrderView id={(await params).id} admin={false} />
     </Workspace>
   );

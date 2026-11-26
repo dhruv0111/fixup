@@ -15,7 +15,7 @@ export async function pageActor(permission: Permission) {
     throw error;
   }
 }
-export function Workspace({
+export async function Workspace({
   title,
   children,
   admin = false,
@@ -25,26 +25,15 @@ export function Workspace({
   admin?: boolean;
 }) {
   return (
-    <main id="main" className="container py-12">
-      <Link className="text-link" href={admin ? "/admin" : "/account"}>
-        ← {admin ? "Admin dashboard" : "My account"}
-      </Link>
-      {admin ? (
-        <nav
-          className="my-5 flex flex-wrap gap-5"
-          aria-label="Sales administration"
-        >
-          <Link className="text-link" href="/admin/sales/orders">
-            Sales orders
-          </Link>
-          <Link className="text-link" href="/admin/sales/payments">
-            Payment verification
-          </Link>
-          <Link className="text-link" href="/admin/sales/settings">
-            Sales settings
-          </Link>
-        </nav>
-      ) : (
+    <main id="main" className="container py-8 sm:py-12">
+      <nav className="crumbs" aria-label="Breadcrumb">
+        <Link href={admin ? "/admin" : "/account"}>
+          {admin ? "Dashboard" : "My account"}
+        </Link>
+        <span aria-hidden="true">›</span>
+        <span aria-current="page">{title}</span>
+      </nav>
+      {!admin && (
         <nav className="my-5 flex flex-wrap gap-5" aria-label="Shopping">
           <Link className="text-link" href="/account/cart">
             Shopping cart
@@ -54,7 +43,7 @@ export function Workspace({
           </Link>
         </nav>
       )}
-      <h1 className="my-6 text-3xl font-semibold">{title}</h1>
+      <h1 className="my-5 text-3xl font-semibold">{title}</h1>
       <div className="space-y-8">{children}</div>
     </main>
   );

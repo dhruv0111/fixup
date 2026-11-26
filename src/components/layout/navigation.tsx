@@ -22,6 +22,7 @@ export async function Navigation() {
           {actor ? (
             <>
               <Link href="/account">My account</Link>
+              <Link href="/account/cart">Cart</Link>
               {actor.permissions.includes("admin.access") && (
                 <Link href="/admin">Admin</Link>
               )}

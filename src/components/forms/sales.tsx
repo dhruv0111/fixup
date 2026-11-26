@@ -4,6 +4,19 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DeliveryTracking } from "./dispatch";
+import {
+  orderStatus,
+  paymentStatus,
+  submissionStatus,
+  buildTimeline,
+  customerExplanation,
+} from "@/components/orders/status";
+import {
+  Card,
+  Facts,
+  ProgressTimeline,
+  StatusBadge,
+} from "@/components/orders/ui";
 const money = (v: number) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(
     v / 100,
@@ -59,9 +72,9 @@ function useData<T>(url: string) {
   }, [url]);
   return { data, error, reload };
 }
-function Message({ text }: { text: string }) {
+function Message({ text, error = false }: { text: string; error?: boolean }) {
   return (
-    <p role="status" className="my-4 text-sm">
+    <p role={error ? "alert" : "status"} className="my-4 text-sm">
       {text}
     </p>
   );
@@ -118,6 +131,13 @@ export function AddCart({ variantId }: { variantId: string }) {
         onClick={async () => {
           setBusy(true);
           try {
+            const cart = await call<Cart>("/api/v1/me/cart");
+            if (cart.lines.some((line) => line.variantId === variantId)) {
+              setMessage(
+                "Already in your cart. Update quantities in your cart.",
+              );
+              return;
+            }
             await call("/api/v1/me/cart", "PATCH", { variantId, quantity: 1 });
             setMessage("Added to cart.");
           } catch (e) {
@@ -130,9 +150,18 @@ export function AddCart({ variantId }: { variantId: string }) {
         Add to cart
       </button>
       {message && (
-        <span role="status" className="block text-sm">
-          {message}
-        </span>
+        <>
+          <span role="status" className="block text-sm">
+            {message}
+          </span>
+          {(message === "Added to cart." ||
+            message ===
+              "Already in your cart. Update quantities in your cart.") && (
+            <Link href="/account/cart" className="text-link">
+              View cart
+            </Link>
+          )}
+        </>
       )}
     </span>
   );
@@ -151,15 +180,66 @@ type CartLine = {
   orderable: boolean;
 };
 type Cart = { category: string; lines: CartLine[] };
+function CartQuantity({
+  line,
+  busy,
+  update,
+  onDraft,
+}: {
+  line: CartLine;
+  busy: boolean;
+  update: (id: string, quantity: number) => Promise<void>;
+  onDraft: (id: string, changed: boolean) => void;
+}) {
+  const [quantity, setQuantity] = useState(String(line.quantity));
+  return (
+    <form
+      className="cart-quantity"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void update(line.variantId, Number(quantity));
+      }}
+    >
+      <label>
+        Quantity
+        <input
+          aria-label={`Quantity ${line.packSize}`}
+          className="field"
+          type="number"
+          inputMode="numeric"
+          min="1"
+          max="10000"
+          step="1"
+          required
+          value={quantity}
+          disabled={busy}
+          onChange={(event) => {
+            setQuantity(event.target.value);
+            onDraft(
+              line.variantId,
+              Number(event.target.value) !== line.quantity,
+            );
+          }}
+        />
+      </label>
+      <button className="button button-secondary" disabled={busy} type="submit">
+        Update quantity
+      </button>
+    </form>
+  );
+}
 export function CartView() {
   const { data, error, reload } = useData<Cart>("/api/v1/me/cart");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [draftIds, setDraftIds] = useState<string[]>([]);
   async function update(id: string, quantity: number) {
     setBusy(true);
+    setMessage("Updating cart…");
     try {
       await call("/api/v1/me/cart", "PATCH", { variantId: id, quantity });
       await reload();
+      setDraftIds((ids) => ids.filter((value) => value !== id));
       setMessage("Cart updated.");
     } catch (e) {
       setMessage((e as Error).message);
@@ -169,7 +249,10 @@ export function CartView() {
   }
   return (
     <section className="info-panel">
-      <Message text={error || message} />
+      <Message
+        text={error || message || (!data ? "Loading cart…" : "")}
+        error={!!error}
+      />
       {data && (
         <>
           <p>
@@ -217,23 +300,25 @@ export function CartView() {
                       )}
                       {!l.orderable && <p>Item is no longer available.</p>}
                     </div>
-                    <label>
-                      Quantity{" "}
-                      <input
-                        aria-label={`Quantity ${l.packSize}`}
-                        className="field w-24"
-                        type="number"
-                        min="1"
-                        max="10000"
-                        value={l.quantity}
-                        disabled={busy}
-                        onChange={(e) => {
-                          const n = Number(e.target.value);
-                          if (Number.isInteger(n) && n > 0)
-                            void update(l.variantId, n);
-                        }}
-                      />
-                    </label>
+                    {l.quantity > l.available && (
+                      <p role="status">
+                        Only {l.available} available. Reduce the quantity before
+                        checkout.
+                      </p>
+                    )}
+                    <CartQuantity
+                      key={`${l.variantId}-${l.quantity}`}
+                      line={l}
+                      busy={busy}
+                      update={update}
+                      onDraft={(id, changed) =>
+                        setDraftIds((ids) =>
+                          changed
+                            ? [...new Set([...ids, id])]
+                            : ids.filter((value) => value !== id),
+                        )
+                      }
+                    />
                     <strong>
                       {l.linePricePaise !== null
                         ? money(l.linePricePaise)
@@ -259,9 +344,19 @@ export function CartView() {
                 Configured tax, delivery charges and final payable amount are
                 shown for review at checkout.
               </p>
-              <Link className="button button-primary" href="/account/checkout">
-                Review checkout
-              </Link>
+              {draftIds.length ? (
+                <p role="status">
+                  Update each changed quantity before checkout. Your total still
+                  reflects saved quantities.
+                </p>
+              ) : (
+                <Link
+                  className="button button-primary"
+                  href="/account/checkout"
+                >
+                  Review checkout
+                </Link>
+              )}
             </>
           )}
         </>
@@ -294,13 +389,30 @@ type Preview = Cart & {
   cancellationRules: Record<string, boolean>;
 };
 function Details({ values }: { values: Record<string, unknown> }) {
+  const captions: Record<string, string> = {
+    line1: "Address line 1",
+    line2: "Address line 2",
+    postalCode: "PIN code",
+    upiId: "UPI ID",
+    ifsc: "IFSC",
+    holderName: "Account holder",
+    verifiedNetPayment: "Verified payment",
+    remaining: "Amount still to verify",
+    reservationDeadline: "Stock reservation deadline",
+    finalPayable: "Total to pay",
+  };
   return (
     <dl className="grid gap-2 my-4">
       {Object.entries(values)
         .filter(([, v]) => v !== "" && v !== null)
         .map(([k, v]) => (
           <div key={k} className="flex flex-wrap gap-2">
-            <dt className="text-muted">{k.replace(/([A-Z])/g, " $1")}:</dt>
+            <dt className="text-muted">
+              {captions[k] ??
+                k.charAt(0).toUpperCase() +
+                  k.slice(1).replace(/([A-Z])/g, " $1")}
+              :
+            </dt>
             <dd className="break-all">{String(v)}</dd>
           </div>
         ))}
@@ -321,7 +433,24 @@ export function Checkout() {
   const [key, setKey] = useState("");
   return (
     <section className="info-panel">
-      <Message text={error || message} />
+      <Message
+        text={
+          error || message || (!addresses ? "Loading delivery addresses…" : "")
+        }
+        error={!!error}
+      />
+      <p className="mb-5 text-sm">
+        Choose a saved delivery address, review the total, then place your
+        order. Payment instructions follow after the order is placed.
+      </p>
+      {addresses?.length === 0 && (
+        <p className="mb-5" role="status">
+          Add a delivery address before reviewing your order.{" "}
+          <Link className="text-link" href="/account/addresses">
+            Add delivery address
+          </Link>
+        </p>
+      )}
       <form
         className="space-y-5"
         onChange={() => setReview(null)}
@@ -392,7 +521,10 @@ export function Checkout() {
             onChange={(e) => setNotes(e.target.value)}
           />
         </label>
-        <button disabled={busy} className="button button-secondary">
+        <button
+          disabled={busy || !addresses?.length}
+          className="button button-secondary"
+        >
           Review current total
         </button>
       </form>
@@ -515,6 +647,8 @@ type Order = {
     variantName: string;
     variantId: string;
     packSize: string;
+    sku?: string | null;
+    imageUrl?: string | null;
     quantity: number;
     unitPricePaise: number;
     linePricePaise: number;
@@ -545,23 +679,118 @@ type Order = {
     createdAt: string;
   }[];
 };
-export function OrderList({ admin = false }: { admin?: boolean }) {
-  const [query, setQuery] = useState("");
+const ORDER_STATUSES = [
+  "PENDING_PAYMENT",
+  "PAYMENT_UNDER_REVIEW",
+  "PAYMENT_REJECTED",
+  "ADMIN_REVIEW",
+  "READY_FOR_DISPATCH",
+  "DISPATCHED",
+  "DELIVERED",
+  "DELIVERY_FAILED",
+  "RETURNED",
+  "CANCELLED",
+  "RESERVATION_EXPIRED",
+];
+const PAYMENT_STATUSES = ["UNPAID", "PARTIALLY_PAID", "PAID", "OVERPAID"];
+const dateText = (v: string) =>
+  new Date(v).toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+// Dispatch progress is shown from the order's existing status; no new state is created.
+const dispatchText = (status: string) =>
+  status === "READY_FOR_DISPATCH"
+    ? "Ready to dispatch"
+    : ["DISPATCHED", "DELIVERED", "DELIVERY_FAILED", "RETURNED"].includes(
+          status,
+        )
+      ? orderStatus(status).label
+      : "Not dispatched";
+function Select({
+  name,
+  label: caption,
+  options,
+  defaultValue = "",
+}: {
+  name: string;
+  label: string;
+  options: [string, string][];
+  defaultValue?: string;
+}) {
+  return (
+    <label className="block text-sm font-medium">
+      {caption}
+      <select className="field mt-1" name={name} defaultValue={defaultValue}>
+        <option value="">All</option>
+        {options.map(([value, text]) => (
+          <option key={value} value={value}>
+            {text}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+function QuickAction({ o }: { o: Order }) {
+  if (o.status === "READY_FOR_DISPATCH")
+    return (
+      <Link
+        className="button compact"
+        href={`/admin/dispatch/new?orderId=${encodeURIComponent(o.id)}`}
+      >
+        Dispatch
+      </Link>
+    );
+  if (o.status === "PAYMENT_UNDER_REVIEW")
+    return (
+      <Link
+        className="button button-secondary compact"
+        href={`/admin/sales/orders/${o.id}#payment`}
+      >
+        Verify payment
+      </Link>
+    );
+  return null;
+}
+export function OrderList({
+  admin = false,
+  initialStatus = "",
+  initialPaymentStatus = "",
+}: {
+  admin?: boolean;
+  initialStatus?: string;
+  initialPaymentStatus?: string;
+}) {
+  const [query, setQuery] = useState(() => {
+    const q = new URLSearchParams();
+    if (ORDER_STATUSES.includes(initialStatus)) q.set("status", initialStatus);
+    if (PAYMENT_STATUSES.includes(initialPaymentStatus))
+      q.set("paymentStatus", initialPaymentStatus);
+    return q.size ? `?${q}` : "";
+  });
+  const [category, setCategory] = useState("");
   const { data, error } = useData<{ orders: Order[] }>(
     `${admin ? "/api/v1/admin/sales" : "/api/v1/me"}/orders${query}`,
   );
+  const orders = (data?.orders ?? []).filter(
+    (o) => !category || o.category === category,
+  );
+  const base = admin ? "/admin/sales/orders" : "/account/orders";
   return (
-    <section className="info-panel">
+    <section className="space-y-5" aria-label="Orders">
       {admin && (
         <form
-          className="grid sm:grid-cols-3 gap-4"
+          className="o-card o-filters"
           onSubmit={(e) => {
             e.preventDefault();
             const fields = new FormData(e.currentTarget);
             const q = new URLSearchParams();
             for (const [key, value] of fields)
-              if (value) q.set(key, String(value));
-            setQuery(`?${q}`);
+              if (value && key !== "category") q.set(key, String(value));
+            setCategory(String(fields.get("category") ?? ""));
+            setQuery(q.size ? `?${q}` : "");
           }}
         >
           <Field
@@ -569,55 +798,197 @@ export function OrderList({ admin = false }: { admin?: boolean }) {
             label="Order number or customer/dealer"
             required={false}
           />
-          <Field
+          <Select
             name="status"
-            label="Order status (e.g. READY_FOR_DISPATCH)"
-            required={false}
+            label="Order status"
+            defaultValue={initialStatus}
+            options={ORDER_STATUSES.map((v) => [v, orderStatus(v).label])}
           />
-          <Field
+          <Select
             name="paymentStatus"
-            label="Payment status (e.g. UNPAID)"
-            required={false}
+            label="Payment status"
+            defaultValue={initialPaymentStatus}
+            options={PAYMENT_STATUSES.map((v) => [v, paymentStatus(v).label])}
+          />
+          <Select
+            name="category"
+            label="Customer category"
+            options={[
+              ["RETAIL", "Retail"],
+              ["APPROVED_DEALER", "Approved dealer"],
+            ]}
           />
           <Field name="from" label="From date" type="date" required={false} />
           <Field name="to" label="To date" type="date" required={false} />
-          <button className="button button-secondary">Search orders</button>
+          <button className="button">Search orders</button>
         </form>
       )}
-      <Message text={error} />
-      {data && !data.orders.length && <p className="my-6">No orders yet.</p>}
-      <ul className="divide-y divide-line">
-        {data?.orders.map((o) => (
-          <li className="py-5" key={o.id}>
-            <Link
-              href={`${admin ? "/admin/sales" : "/account"}/orders/${o.id}`}
-              className="text-link font-semibold"
-            >
-              {o.number}
+      {error && (
+        <p role="alert" className="o-callout status-red">
+          <strong>Orders could not be loaded</strong>
+          <span>{error}</span>
+        </p>
+      )}
+      {!error && !data && (
+        <p role="status" className="text-muted">
+          Loading orders…
+        </p>
+      )}
+      {data && !orders.length && (
+        <div className="o-card text-center">
+          <p className="font-semibold">
+            {query || category
+              ? "No orders match these filters"
+              : "No orders yet."}
+          </p>
+          <p className="mt-1 text-sm text-muted">
+            {admin
+              ? "Adjust or clear the filters to see more orders."
+              : "When you place an order it will appear here."}
+          </p>
+          {!admin && (
+            <Link href="/products" className="button mt-4">
+              Browse products
             </Link>
-            <p>
-              {new Date(o.createdAt).toLocaleString()} · {money(o.totalPaise)} ·{" "}
-              {label(o.category)}
-            </p>
-            <p>
-              {label(o.status)} · {label(o.paymentStatus)}
-            </p>
-            <p>
-              {o.lines
-                .map((l) => `${l.productName} ${l.packSize} × ${l.quantity}`)
-                .join(", ")}
-            </p>
-            <p>
-              Payment proof:{" "}
-              {o.submissions.length
-                ? label(o.submissions.at(-1)!.status)
-                : "Not submitted"}
-            </p>
-          </li>
-        ))}
-      </ul>
-      {admin && (
-        <p className="text-sm mt-4">
+          )}
+        </div>
+      )}
+      {!!orders.length && admin && (
+        <div
+          className="o-card o-responsive"
+          role="region"
+          aria-label="Orders table"
+          tabIndex={0}
+        >
+          <table className="o-table">
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Customer</th>
+                <th>Date</th>
+                <th className="num">Items</th>
+                <th className="num">Total</th>
+                <th>Payment</th>
+                <th>Order status</th>
+                <th>Dispatch</th>
+                <th>
+                  <span className="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map((o) => (
+                <tr key={o.id}>
+                  <td data-label="Order">
+                    <Link
+                      href={`${base}/${o.id}`}
+                      className="text-link font-semibold"
+                    >
+                      {o.number}
+                    </Link>
+                  </td>
+                  <td data-label="Customer">
+                    {o.customerSnapshot.businessName || o.customerSnapshot.name}
+                    <div className="text-xs text-muted">
+                      {o.category === "APPROVED_DEALER" ? "Dealer" : "Retail"}
+                    </div>
+                  </td>
+                  <td data-label="Date">{dateText(o.createdAt)}</td>
+                  <td data-label="Items" className="num">
+                    {o.lines.length}
+                  </td>
+                  <td data-label="Total" className="num">
+                    {money(o.totalPaise)}
+                  </td>
+                  <td data-label="Payment">
+                    <StatusBadge {...paymentStatus(o.paymentStatus)} />
+                  </td>
+                  <td data-label="Status">
+                    <StatusBadge {...orderStatus(o.status)} />
+                  </td>
+                  <td data-label="Dispatch" className="text-sm">
+                    {dispatchText(o.status)}
+                  </td>
+                  <td>
+                    <QuickAction o={o} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {!!orders.length && !admin && (
+        <ul className="o-order-cards">
+          {orders.map((o) => {
+            const first = o.lines[0];
+            return (
+              <li key={o.id} className="o-order-card">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    {!admin && first?.imageUrl && (
+                      <Image
+                        unoptimized
+                        src={first.imageUrl}
+                        alt=""
+                        width={44}
+                        height={44}
+                        className="o-thumb"
+                      />
+                    )}
+                    <div>
+                      <Link
+                        href={`${base}/${o.id}`}
+                        className="text-link font-semibold"
+                      >
+                        {o.number}
+                      </Link>
+                      <p className="text-xs text-muted">
+                        {dateText(o.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+                  <strong>{money(o.totalPaise)}</strong>
+                </div>
+                {admin && (
+                  <p className="text-sm">
+                    {o.customerSnapshot.businessName || o.customerSnapshot.name}{" "}
+                    · {o.category === "APPROVED_DEALER" ? "Dealer" : "Retail"}
+                  </p>
+                )}
+                <p className="text-sm text-muted">
+                  {first
+                    ? `${first.productName} ${first.packSize}${
+                        o.lines.length > 1
+                          ? ` + ${o.lines.length - 1} more`
+                          : ""
+                      }`
+                    : ""}{" "}
+                  · {o.lines.length} {o.lines.length === 1 ? "item" : "items"}
+                </p>
+                <p className="sr-only">
+                  {label(o.status)} · {label(o.paymentStatus)}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <StatusBadge {...orderStatus(o.status)} />
+                  <StatusBadge {...paymentStatus(o.paymentStatus)} />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    href={`${base}/${o.id}`}
+                    className="button button-secondary compact"
+                  >
+                    View details
+                  </Link>
+                  {admin && <QuickAction o={o} />}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {admin && !!data?.orders.length && (
+        <p className="text-sm text-muted">
           Latest 200 matching orders. Narrow filters for older records.
         </p>
       )}
@@ -633,6 +1004,7 @@ function ProofUpload({
 }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
   return (
     <section className="info-panel">
       <h2 className="text-xl font-semibold">Submit payment proof</h2>
@@ -641,7 +1013,11 @@ function ProofUpload({
           ? "Do not send a new payment for this cancelled or expired order. If you already transferred money, submit proof for admin review; stock is not restored automatically."
           : order.remainingPaise === 0
             ? "No further payment is requested. You may submit missing evidence for an earlier transfer."
-            : "Transfer the exact remaining amount using the instructions. A screenshot supports manual review and does not confirm payment."}{" "}
+            : order.submissions.some((s) =>
+                  ["SUBMITTED", "UNDER_REVIEW"].includes(s.status),
+                )
+              ? "A payment proof is already awaiting review. Check its status below before making another transfer. A screenshot does not confirm payment."
+              : "Transfer the exact remaining amount using the instructions. A screenshot supports manual review and does not confirm payment."}{" "}
         PNG, JPEG or WebP, up to 5 MiB and 16 megapixels.
       </p>
       <form
@@ -656,6 +1032,7 @@ function ProofUpload({
               (form.dataset.requestId = crypto.randomUUID()),
           );
           setBusy(true);
+          setFailed(false);
           try {
             const r = await fetch(`/api/v1/me/orders/${order.id}/payments`, {
               method: "POST",
@@ -669,6 +1046,7 @@ function ProofUpload({
             delete form.dataset.requestId;
             await reload();
           } catch (e) {
+            setFailed(true);
             setMessage((e as Error).message);
           } finally {
             setBusy(false);
@@ -699,7 +1077,7 @@ function ProofUpload({
           Submit for verification
         </button>
       </form>
-      <Message text={message} />
+      <Message text={message} error={failed} />
     </section>
   );
 }
@@ -917,179 +1295,454 @@ export function OrderView({
   } = useData<Order>(
     `${admin ? "/api/v1/admin/sales" : "/api/v1/me"}/orders/${id}`,
   );
+  const closed = ["CANCELLED", "RESERVATION_EXPIRED"].includes(o?.status ?? "");
+  const payPending = o?.submissions.some((s) =>
+    ["SUBMITTED", "UNDER_REVIEW"].includes(s.status),
+  );
+  const latestSubmission = o?.submissions.at(-1);
+  const latestPayment = o?.payments.at(-1);
+  const explanation = o && customerExplanation(o);
   return (
     <>
-      <Message text={error} />
-      {o && (
+      {error && (
+        <p role="alert" className="o-callout status-red">
+          <strong>Order could not be loaded</strong>
+          <span>{error}</span>
+        </p>
+      )}
+      {!error && !o && (
+        <p role="status" className="min-h-screen text-muted">
+          Loading order details…
+        </p>
+      )}
+      {o && explanation && (
         <>
-          {admin ? (
-            <Link
-              href={`/admin/dispatch?q=${encodeURIComponent(o.number)}`}
-              className="text-link"
-            >
-              Manage dispatch & delivery
-            </Link>
-          ) : (
-            <DeliveryTracking orderId={o.id} />
-          )}
-          <section className="info-panel">
-            <h2 className="text-xl font-semibold">{o.number}</h2>
-            <p className="my-3">
-              {label(o.status)} · {label(o.paymentStatus)} · {label(o.category)}
-            </p>
-            <p>{new Date(o.createdAt).toLocaleString()}</p>
-            <Details values={o.customerSnapshot} />
-            <Details values={o.addressSnapshot} />
-            <ul className="divide-y divide-line">
-              {o.lines.map((l) => (
-                <li className="py-3" key={l.id}>
-                  {l.productName} · {l.packSize} × {l.quantity} ·{" "}
-                  {money(l.unitPricePaise)} each · {money(l.linePricePaise)}
-                </li>
-              ))}
-            </ul>
-            <Details
-              values={{
-                subtotal: money(o.subtotalPaise),
-                tax: `${money(o.taxPaise)} (${o.taxMode.toLowerCase()})`,
-                delivery: money(o.deliveryPaise),
-                total: money(o.totalPaise),
-                verifiedNetPayment: money(o.verifiedPaise),
-                remaining: money(o.remainingPaise),
-                reservationDeadline: new Date(
-                  o.reservationExpiresAt,
-                ).toLocaleString(),
-                customerNotes: o.notes,
-              }}
-            />
-            {o.lateReviewRequired && (
-              <p>
-                Late payment / reservation review required. Stock will not be
-                restored automatically.
-              </p>
-            )}
-            {o.refundDecisionRequired && (
-              <p>
-                Manual refund decision required. No refund has been initiated by
-                this website.
-              </p>
-            )}
-            <h3 className="font-semibold mt-6">Payment instructions</h3>
-            <Details values={o.paymentDetails} />
-            <p>
-              {["CANCELLED", "RESERVATION_EXPIRED"].includes(o.status)
-                ? "Do not make a new transfer. Existing payments require admin review."
-                : o.remainingPaise === 0
-                  ? "No further payment is requested. Verified funds are recorded below."
-                  : "Use your order number as payment remarks. Upload proof after your direct transfer; FIXUP will verify the actual bank record."}
-            </p>
-            <h3 className="font-semibold mt-6">Stock reservations</h3>
-            <ul>
-              {o.reservations.map((r) => (
-                <li key={r.id}>
-                  {o.lines.find((l) => l.variantId === r.variantId)?.packSize ??
-                    r.variantId}{" "}
-                  · {r.quantity} units · {r.status} ·{" "}
-                  {r.expiresAt
-                    ? new Date(r.expiresAt).toLocaleString()
-                    : r.status === "CONSUMED"
-                      ? "Dispatched"
-                      : "Held after full verified payment"}
-                </li>
-              ))}
-            </ul>
-            {admin && <Details values={{ internalNotes: o.internalNotes }} />}
-          </section>
-          {!admin && <ProofUpload order={o} reload={reload} />}
-          <section className="info-panel">
-            <h2 className="text-xl font-semibold">Payment submissions</h2>
-            {!o.submissions.length && <p className="mt-4">Not submitted.</p>}
-            {o.submissions.map((s) => (
-              <article key={s.id} className="border-t border-line py-6">
-                <h3 className="font-semibold">
-                  {label(s.status)} · {s.method} · {s.reference}
-                </h3>
-                <p>
-                  Payment date {s.paidOn.slice(0, 10)} · Submitted{" "}
-                  {new Date(s.createdAt).toLocaleString()}
+          <header className="o-card">
+            <div className="o-header">
+              <div>
+                <p className="eyebrow">
+                  {admin ? "Sales order" : "Your order"}
                 </p>
-                {s.duplicateReference && (
-                  <p>
-                    Possible duplicate reference or screenshot. Admin review
-                    required.
-                  </p>
-                )}
-                {s.late && (
-                  <p>Submission close to or after reservation expiry.</p>
-                )}
-                <p>{s.publicMessage}</p>
-                {admin && (
-                  <p>
-                    {s.internalNotes} · Reviewer {s.reviewedById}
-                  </p>
-                )}
-                <a
-                  className="text-link"
-                  href={`/api/v1/payments/${s.id}/proof`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Open private payment proof
-                </a>
-                <Image
-                  unoptimized
-                  src={`/api/v1/payments/${s.id}/proof`}
-                  alt="Private payment screenshot"
-                  width={s.width}
-                  height={s.height}
-                  className="my-4 max-h-80 w-auto max-w-full object-contain"
-                />
-                {admin && ["SUBMITTED", "UNDER_REVIEW"].includes(s.status) && (
-                  <ReviewForm submission={s} reload={reload} />
-                )}
-              </article>
-            ))}
-          </section>
-          <section className="info-panel">
-            <h2 className="text-xl font-semibold">Verified payment history</h2>
-            {!o.payments.length && (
-              <p className="mt-4">No verified payments.</p>
-            )}
-            {o.payments.map((p) => (
-              <div className="my-4" key={p.id}>
-                <p>
-                  {p.kind} · {money(p.amountPaise)} · {p.method} ·{" "}
-                  {p.bankReference} · {new Date(p.createdAt).toLocaleString()}
+                <h2 className="text-2xl font-semibold">{o.number}</h2>
+                <p className="mt-1 text-sm text-muted">
+                  Placed {dateText(o.createdAt)}
+                  {admin &&
+                    ` · ${
+                      o.customerSnapshot.businessName || o.customerSnapshot.name
+                    }`}
                 </p>
+                <p className="sr-only">
+                  {label(o.status)} · {label(o.paymentStatus)} ·{" "}
+                  {label(o.category)}
+                </p>
+                <div className="o-badges">
+                  <StatusBadge {...orderStatus(o.status)} />
+                  <StatusBadge {...paymentStatus(o.paymentStatus)} />
+                  <StatusBadge
+                    label={`Dispatch: ${dispatchText(o.status)}`}
+                    tone={
+                      ["DISPATCHED", "DELIVERED"].includes(o.status)
+                        ? "blue"
+                        : "gray"
+                    }
+                  />
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-muted">Order total</p>
+                <p className="text-2xl font-semibold">{money(o.totalPaise)}</p>
                 {admin && (
-                  <p>
-                    Verifier {p.verifiedById} · {p.notes}
-                  </p>
+                  <div className="mt-3 flex flex-wrap justify-end gap-2">
+                    {payPending && (
+                      <a className="button compact" href="#payment">
+                        Review payment
+                      </a>
+                    )}
+                    {o.status === "READY_FOR_DISPATCH" && (
+                      <Link
+                        className="button compact"
+                        href={`/admin/dispatch/new?orderId=${encodeURIComponent(o.id)}`}
+                      >
+                        Create dispatch
+                      </Link>
+                    )}
+                    <Link
+                      className="button button-secondary compact"
+                      href={`/admin/dispatch?q=${encodeURIComponent(o.number)}`}
+                    >
+                      Dispatch & delivery
+                    </Link>
+                  </div>
+                )}
+                {!admin && !closed && o.remainingPaise > 0 && (
+                  <a
+                    className="button compact mt-3"
+                    href="#payment-instructions"
+                  >
+                    Payment instructions
+                  </a>
                 )}
               </div>
-            ))}
-          </section>
-          {(admin || !o.reservations.some((r) => r.status === "CONSUMED")) && (
-            <OrderActions order={o} admin={admin} reload={reload} />
+            </div>
+          </header>
+          {!admin && (
+            <div className={`o-callout status-${explanation.tone}`}>
+              <strong>{explanation.title}</strong>
+              {explanation.body}
+            </div>
           )}
-          <section className="info-panel">
-            <h2 className="text-xl font-semibold">Order status history</h2>
-            <ul className="divide-y divide-line">
-              {o.events.map((e) => (
-                <li className="py-4" key={e.id}>
-                  <p>
-                    {new Date(e.createdAt).toLocaleString()} · {label(e.kind)}
+          {admin && (o.lateReviewRequired || o.refundDecisionRequired) && (
+            <div className="o-callout status-amber">
+              <strong>Admin decision required</strong>
+              {o.lateReviewRequired &&
+                "Late payment / reservation review required. Stock will not be restored automatically. "}
+              {o.refundDecisionRequired &&
+                "Manual refund decision required. No refund has been initiated by this website."}
+            </div>
+          )}
+          <Card title="Order progress">
+            <ProgressTimeline
+              steps={buildTimeline(o, admin ? "admin" : "customer")}
+            />
+          </Card>
+          <div className="o-grid">
+            <div className="o-stack">
+              <Card title="Ordered products">
+                <div
+                  className="o-scroll o-responsive"
+                  role="region"
+                  aria-label="Ordered products"
+                  tabIndex={0}
+                >
+                  <table className="o-table">
+                    <thead>
+                      <tr>
+                        <th>Product</th>
+                        <th>SKU</th>
+                        <th className="num">Qty</th>
+                        <th className="num">Unit price</th>
+                        <th className="num">Line total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {o.lines.map((l) => (
+                        <tr key={l.id}>
+                          <td>
+                            <div className="flex items-center gap-3">
+                              {l.imageUrl && (
+                                <Image
+                                  unoptimized
+                                  src={l.imageUrl}
+                                  alt=""
+                                  width={44}
+                                  height={44}
+                                  className="o-thumb"
+                                />
+                              )}
+                              <span>
+                                <strong>{l.productName}</strong>
+                                <br />
+                                <span className="text-xs text-muted">
+                                  {l.variantName} · {l.packSize}
+                                </span>
+                              </span>
+                            </div>
+                          </td>
+                          <td data-label="SKU">{l.sku ?? "—"}</td>
+                          <td className="num" data-label="Quantity">
+                            {l.quantity}
+                          </td>
+                          <td className="num" data-label="Unit price">
+                            {money(l.unitPricePaise)}
+                          </td>
+                          <td className="num" data-label="Line total">
+                            {money(l.linePricePaise)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-4 ml-auto max-w-xs">
+                  <Facts
+                    items={[
+                      ["Subtotal", money(o.subtotalPaise)],
+                      [`Tax (${o.taxMode.toLowerCase()})`, money(o.taxPaise)],
+                      ["Delivery", money(o.deliveryPaise)],
+                      [
+                        "Grand total",
+                        <strong key="t">{money(o.totalPaise)}</strong>,
+                      ],
+                    ]}
+                  />
+                </div>
+                {o.notes && (
+                  <p className="mt-4 text-sm">
+                    <span className="text-muted">Customer notes: </span>
+                    {o.notes}
                   </p>
-                  <p>{e.message}</p>
-                  {admin && <p className="text-muted">{e.internalNotes}</p>}
-                </li>
-              ))}
-            </ul>
-            <p className="mt-3 text-sm text-muted">
-              Status updates appear here. No external message delivery is
-              implied.
-            </p>
-          </section>
+                )}
+              </Card>
+              <Card title="Payment" id="payment">
+                <Facts
+                  items={[
+                    ["Required amount", money(o.totalPaise)],
+                    ["Verified received", money(o.verifiedPaise)],
+                    [
+                      "Remaining balance",
+                      o.remainingPaise ? money(o.remainingPaise) : null,
+                    ],
+                    [
+                      "Method",
+                      latestPayment?.method ?? latestSubmission?.method,
+                    ],
+                    [
+                      "Reference",
+                      latestPayment?.bankReference ??
+                        latestSubmission?.reference,
+                    ],
+                    [
+                      "Submitted",
+                      latestSubmission && dateText(latestSubmission.createdAt),
+                    ],
+                    [
+                      "Verification",
+                      latestSubmission && (
+                        <StatusBadge
+                          key="v"
+                          {...submissionStatus(latestSubmission.status)}
+                        />
+                      ),
+                    ],
+                  ]}
+                />
+                {!o.submissions.length && (
+                  <p className="mt-3 text-sm text-muted">
+                    No payment proof submitted yet.
+                  </p>
+                )}
+                {o.submissions.map((s) => (
+                  <article
+                    key={s.id}
+                    className="mt-5 border-t border-line pt-5"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusBadge {...submissionStatus(s.status)} />
+                      <h3 className="text-sm font-semibold">
+                        {label(s.status)} · {s.method} · {s.reference}
+                      </h3>
+                    </div>
+                    <p className="mt-1 text-sm text-muted">
+                      Paid on {s.paidOn.slice(0, 10)} · Submitted{" "}
+                      {dateText(s.createdAt)}
+                    </p>
+                    {s.duplicateReference && (
+                      <p className="o-callout status-amber mt-2">
+                        Possible duplicate reference or screenshot. Admin review
+                        required.
+                      </p>
+                    )}
+                    {s.late && (
+                      <p className="o-callout status-amber mt-2">
+                        Submission close to or after reservation expiry.
+                      </p>
+                    )}
+                    {s.publicMessage && (
+                      <p className="mt-2 text-sm">{s.publicMessage}</p>
+                    )}
+                    {admin && (s.internalNotes || s.reviewedById) && (
+                      <p className="mt-2 text-sm text-muted">
+                        Internal: {s.internalNotes}
+                        {s.reviewedById && ` · Reviewer ${s.reviewedById}`}
+                      </p>
+                    )}
+                    <a
+                      className="text-link"
+                      href={`/api/v1/payments/${s.id}/proof`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open private payment proof
+                    </a>
+                    <Image
+                      unoptimized
+                      src={`/api/v1/payments/${s.id}/proof`}
+                      alt="Private payment screenshot"
+                      width={s.width}
+                      height={s.height}
+                      className="my-4 max-h-80 w-auto max-w-full rounded-lg border border-line object-contain"
+                    />
+                    {admin &&
+                      ["SUBMITTED", "UNDER_REVIEW"].includes(s.status) && (
+                        <ReviewForm submission={s} reload={reload} />
+                      )}
+                  </article>
+                ))}
+                {!!o.payments.length && (
+                  <div className="mt-5 border-t border-line pt-5">
+                    <h3 className="mb-2 text-sm font-semibold">
+                      Verified payment history
+                    </h3>
+                    <ul className="space-y-2 text-sm">
+                      {o.payments.map((p) => (
+                        <li key={p.id}>
+                          {p.kind === "REFUND" ? "Refund" : "Payment"} ·{" "}
+                          {money(p.amountPaise)} · {p.method} ·{" "}
+                          {p.bankReference} · {dateText(p.createdAt)}
+                          {admin && (
+                            <span className="text-muted">
+                              {" "}
+                              · Verifier {p.verifiedById} {p.notes}
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </Card>
+              {!admin && <ProofUpload order={o} reload={reload} />}
+              {(admin ||
+                !o.reservations.some((r) => r.status === "CONSUMED")) && (
+                <OrderActions order={o} admin={admin} reload={reload} />
+              )}
+              <Card title={admin ? "Activity history" : "Order status history"}>
+                <ul className="divide-y divide-line">
+                  {o.events.map((e) => (
+                    <li className="py-3 text-sm" key={e.id}>
+                      <p className="font-semibold">
+                        {label(e.kind)}{" "}
+                        <span className="font-normal text-muted">
+                          · {dateText(e.createdAt)}
+                        </span>
+                      </p>
+                      <p>{e.message}</p>
+                      {admin && e.internalNotes && (
+                        <p className="mt-1 rounded-md bg-[#f8f6fa] px-2 py-1 text-muted">
+                          Internal note: {e.internalNotes}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 text-xs text-muted">
+                  Status updates appear here. No external message delivery is
+                  implied.
+                </p>
+              </Card>
+            </div>
+            <aside className="o-stack">
+              <Card title="Customer">
+                <Facts
+                  items={[
+                    ["Name", o.customerSnapshot.name],
+                    ["Business", o.customerSnapshot.businessName],
+                    ["Email", o.customerSnapshot.email],
+                    ["Phone", o.customerSnapshot.phone],
+                    [
+                      "Category",
+                      o.category === "APPROVED_DEALER"
+                        ? "Approved dealer"
+                        : "Retail",
+                    ],
+                    ["GSTIN", o.customerSnapshot.gstin],
+                  ]}
+                />
+                <h3 className="mb-2 mt-4 text-sm font-semibold">
+                  Shipping address
+                </h3>
+                <p className="text-sm">
+                  {[
+                    o.addressSnapshot.line1,
+                    o.addressSnapshot.line2,
+                    o.addressSnapshot.city,
+                    o.addressSnapshot.state,
+                    o.addressSnapshot.postalCode,
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}
+                </p>
+                {admin && (
+                  <Link
+                    href="/admin/customers"
+                    className="text-link mt-3 inline-block"
+                  >
+                    Customers list
+                  </Link>
+                )}
+              </Card>
+              {admin ? (
+                <Card title="Dispatch">
+                  <p className="text-sm">
+                    Status: <strong>{dispatchText(o.status)}</strong>
+                  </p>
+                  <p className="mt-2 text-sm text-muted">
+                    Courier, AWB, packages, delivery events and proof are
+                    managed on the dispatch screen.
+                  </p>
+                  <Link
+                    href={`/admin/dispatch?q=${encodeURIComponent(o.number)}`}
+                    className="button button-secondary compact mt-3"
+                  >
+                    Open dispatch & delivery
+                  </Link>
+                </Card>
+              ) : (
+                <DeliveryTracking orderId={o.id} />
+              )}
+              {!admin && (
+                <Card title="Payment instructions" id="payment-instructions">
+                  <Facts
+                    items={Object.entries(o.paymentDetails).map(([k, v]) => [
+                      k === "upiId"
+                        ? "UPI ID"
+                        : k === "ifsc"
+                          ? "IFSC"
+                          : k === "holderName"
+                            ? "Account holder"
+                            : k.charAt(0).toUpperCase() +
+                              k.slice(1).replace(/([A-Z])/g, " $1"),
+                      v,
+                    ])}
+                  />
+                  <p className="mt-3 text-sm">
+                    {closed
+                      ? "Do not make a new transfer. Existing payments require admin review."
+                      : o.remainingPaise === 0
+                        ? "No further payment is requested. Verified funds are recorded."
+                        : `Amount to pay: ${money(o.remainingPaise)}. Use your order number as the payment remark, then upload proof; FIXUP verifies the actual bank record.`}
+                  </p>
+                  {!closed && o.remainingPaise > 0 && (
+                    <p className="mt-2 text-sm">
+                      Reservation deadline:{" "}
+                      <strong>{dateText(o.reservationExpiresAt)}</strong>
+                    </p>
+                  )}
+                </Card>
+              )}
+              <Card title="Stock reservation">
+                <ul className="space-y-1 text-sm">
+                  {o.reservations.map((r) => (
+                    <li key={r.id}>
+                      {o.lines.find((l) => l.variantId === r.variantId)
+                        ?.packSize ?? r.variantId}{" "}
+                      · {r.quantity} units · {label(r.status)} ·{" "}
+                      {r.expiresAt
+                        ? dateText(r.expiresAt)
+                        : r.status === "CONSUMED"
+                          ? "Dispatched"
+                          : "Held after full verified payment"}
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+              {admin && o.internalNotes && (
+                <Card title="Internal notes (admin only)">
+                  <p className="text-sm">{o.internalNotes}</p>
+                </Card>
+              )}
+            </aside>
+          </div>
         </>
       )}
     </>
@@ -1115,32 +1768,84 @@ export function PaymentQueue() {
       };
     }[]
   >("/api/v1/admin/sales/payments");
+  const pending = (data ?? []).filter((s) =>
+    ["SUBMITTED", "UNDER_REVIEW"].includes(s.status),
+  );
+  const reviewed = (data ?? []).filter(
+    (s) => !["SUBMITTED", "UNDER_REVIEW"].includes(s.status),
+  );
+  const row = (s: NonNullable<typeof data>[number]) => (
+    <li key={s.id} className="o-queue-row">
+      <div className="o-queue-main">
+        <Link
+          className="text-link font-semibold"
+          href={`/admin/sales/orders/${s.orderId}#payment`}
+        >
+          {s.order.number}
+        </Link>
+        <span>{s.order.customerSnapshot.name}</span>
+        <strong>{money(s.order.totalPaise)}</strong>
+      </div>
+      <div className="o-badges">
+        <StatusBadge {...submissionStatus(s.status)} />
+        <StatusBadge {...paymentStatus(s.order.paymentStatus)} />
+        {s.duplicateReference && (
+          <StatusBadge label="Possible duplicate" tone="amber" />
+        )}
+        {s.late && <StatusBadge label="Late review required" tone="amber" />}
+      </div>
+      <p className="text-sm text-muted">
+        {s.method} · Ref {s.reference} · Paid {s.paidOn.slice(0, 10)} ·
+        Submitted {dateText(s.createdAt)}
+      </p>
+      {["SUBMITTED", "UNDER_REVIEW"].includes(s.status) && (
+        <Link
+          className="button compact"
+          href={`/admin/sales/orders/${s.orderId}#payment`}
+        >
+          Inspect proof & verify
+        </Link>
+      )}
+    </li>
+  );
   return (
-    <section className="info-panel">
-      <Message text={error} />
-      {data && !data.length && <p>No payment submissions yet.</p>}
-      <ul className="divide-y divide-line">
-        {data?.map((s) => (
-          <li className="py-5" key={s.id}>
-            <Link
-              className="text-link"
-              href={`/admin/sales/orders/${s.orderId}`}
-            >
-              {s.order.number} · {s.order.customerSnapshot.name}
-            </Link>
-            <p>
-              {money(s.order.totalPaise)} · {label(s.order.paymentStatus)} ·{" "}
-              {label(s.status)}
-            </p>
-            <p>
-              {s.method} · {s.reference} · Payment date {s.paidOn.slice(0, 10)}{" "}
-              · Submitted {new Date(s.createdAt).toLocaleString()}
-            </p>
-            {s.duplicateReference && <p>Possible duplicate</p>}
-            {s.late && <p>Late review required</p>}
-          </li>
-        ))}
-      </ul>
+    <section className="space-y-5" aria-label="Payment submissions">
+      {error && (
+        <p role="alert" className="o-callout status-red">
+          <strong>Payments could not be loaded</strong>
+          <span>{error}</span>
+        </p>
+      )}
+      {!error && !data && (
+        <p role="status" className="text-muted">
+          Loading payment submissions…
+        </p>
+      )}
+      {data && !data.length && (
+        <div className="o-card text-center">
+          <p className="font-semibold">No payment submissions yet.</p>
+          <p className="mt-1 text-sm text-muted">
+            Submitted payment proofs will appear here for verification.
+          </p>
+        </div>
+      )}
+      {!!pending.length && (
+        <Card
+          title={`Waiting for verification (${pending.length})`}
+          action={
+            <span className="text-sm text-muted">
+              Open a submission to check the proof against the bank record.
+            </span>
+          }
+        >
+          <ul className="o-queue">{pending.map(row)}</ul>
+        </Card>
+      )}
+      {!!reviewed.length && (
+        <Card title={`Reviewed (${reviewed.length})`}>
+          <ul className="o-queue">{reviewed.map(row)}</ul>
+        </Card>
+      )}
     </section>
   );
 }

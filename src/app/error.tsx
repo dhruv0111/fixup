@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 
 export default function ErrorPage({
   reset,
@@ -13,9 +14,14 @@ export default function ErrorPage({
       <p className="my-5 text-muted">
         We couldn’t load this page. Please try again in a moment.
       </p>
-      <button type="button" onClick={reset} className="button">
-        Try again
-      </button>
+      <div className="flex flex-wrap gap-3">
+        <button type="button" onClick={reset} className="button">
+          Try again
+        </button>
+        <Link href="/" className="button button-secondary">
+          FIXUP home
+        </Link>
+      </div>
     </main>
   );
 }

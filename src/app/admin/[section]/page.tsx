@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { pageActor, Workspace } from "@/components/management/shared";
 import { listAccounts } from "@/modules/management/accounts";
+import { StatusBadge } from "@/components/orders/ui";
+import { titleCase } from "@/components/orders/status";
 export default async function Page({
   params,
   searchParams,
@@ -41,29 +43,46 @@ export default async function Page({
         </label>
         <button className="button">Search</button>
       </form>
-      <p>{result.total} records</p>
-      <div className="grid gap-4 sm:grid-cols-2">
-        {result.items.map((item) => (
-          <Link
-            key={item.id}
-            href={`/admin/${section}/${item.id}`}
-            className="info-panel block"
-          >
-            <h2 className="text-lg font-semibold">
-              {"user" in item ? item.user.name : item.businessName}
-            </h2>
-            <p className="mt-2 break-words">
-              {"user" in item ? item.user.email : item.email}
-            </p>
-            <p className="mt-3 text-sm">
-              {"user" in item
-                ? item.user.active
-                  ? "ACTIVE"
-                  : "INACTIVE"
-                : item.status}
-            </p>
-          </Link>
-        ))}
+      <p className="text-sm text-muted">{result.total} records</p>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {result.items.map((item) => {
+          const isCustomer = "user" in item;
+          const status = isCustomer
+            ? item.user.active
+              ? "ACTIVE"
+              : "INACTIVE"
+            : item.status;
+          const tone =
+            status === "ACTIVE" || status === "APPROVED"
+              ? "green"
+              : status === "PENDING"
+                ? "amber"
+                : status === "INACTIVE" || status === "SUSPENDED"
+                  ? "gray"
+                  : "red";
+          return (
+            <Link
+              key={item.id}
+              href={`/admin/${section}/${item.id}`}
+              className={`o-card block hover:border-[#b9a3d6] ${status === "PENDING" ? "o-card-attention" : ""}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <h2 className="text-lg font-semibold">
+                  {isCustomer ? item.user.name : item.businessName}
+                </h2>
+                <StatusBadge label={titleCase(status)} tone={tone} />
+              </div>
+              <p className="mt-2 break-words text-sm text-muted">
+                {isCustomer ? item.user.email : item.email}
+              </p>
+              {status === "PENDING" && (
+                <p className="mt-3 text-sm font-semibold text-[#8a5a00]">
+                  Waiting for your review
+                </p>
+              )}
+            </Link>
+          );
+        })}
       </div>
       {result.total === 0 && <p>No matching records.</p>}
       <nav aria-label="Results pagination" className="flex gap-4">

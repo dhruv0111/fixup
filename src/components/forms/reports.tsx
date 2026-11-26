@@ -224,12 +224,17 @@ export function ReportTable({ rows }: { rows: Row[] }) {
         </p>
       ) : (
         <>
-          <div className="max-w-full overflow-x-auto rounded-xl border border-line bg-white">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-purple-50">
+          <div
+            className="o-card o-scroll"
+            role="region"
+            aria-label="Report data"
+            tabIndex={0}
+          >
+            <table className="o-table">
+              <thead>
                 <tr>
                   {columns.map((c) => (
-                    <th className="whitespace-nowrap p-4 font-medium" key={c}>
+                    <th className="whitespace-nowrap" key={c}>
                       {c}
                     </th>
                   ))}
@@ -241,10 +246,7 @@ export function ReportTable({ rows }: { rows: Row[] }) {
                   .map((row, i) => (
                     <tr key={i}>
                       {columns.map((c) => (
-                        <td
-                          className="max-w-xs break-words p-4 align-top"
-                          key={c}
-                        >
+                        <td className="max-w-xs break-words align-top" key={c}>
                           {row[c] === null ? (
                             "Incomplete / not recorded"
                           ) : typeof row[c] === "boolean" ? (
@@ -304,6 +306,7 @@ function Filters({
   options: Options | null;
 }) {
   const [preset, setPreset] = useState("month");
+  const [advancedLoaded, setAdvancedLoaded] = useState(false);
   const operational = [
     "sales",
     "payments",
@@ -374,236 +377,272 @@ function Filters({
                 : "SO number or customer / dealer"
         }
       />
-      {operational && (
-        <>
-          <label className="text-sm">
-            Customer
-            <select
-              aria-label="Customer"
-              name="customerId"
-              className="field mt-2"
-            >
-              <option value="">All customers</option>
-              {options?.customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.user.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm">
-            Dealer
-            <select aria-label="Dealer" name="dealerId" className="field mt-2">
-              <option value="">All dealers</option>
-              {options?.customers
-                .filter((c) => c.dealer)
-                .map((c) => (
-                  <option key={c.dealer!.id} value={c.dealer!.id}>
-                    {c.dealer!.businessName}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <label className="text-sm">
-            Customer category
-            <select
-              aria-label="Customer category"
-              name="customerCategory"
-              className="field mt-2"
-            >
-              <option value="">Retail and dealer</option>
-              <option value="RETAIL">Retail</option>
-              <option value="APPROVED_DEALER">Approved dealer sales</option>
-            </select>
-          </label>
-        </>
-      )}
-      {["purchases", "suppliers"].includes(kind) && (
-        <label className="text-sm">
-          Supplier
-          <select
-            aria-label="Supplier"
-            name="supplierId"
-            className="field mt-2"
-          >
-            <option value="">All suppliers</option>
-            {options?.suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      {[
-        "sales",
-        "products",
-        "inventory",
-        "profitability",
-        "purchases",
-      ].includes(kind) && (
-        <>
-          <label className="text-sm">
-            Product
-            <select
-              aria-label="Product"
-              name="productId"
-              className="field mt-2"
-            >
-              <option value="">All products</option>
-              {options?.products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm">
-            Variant
-            <select
-              aria-label="Variant"
-              name="variantId"
-              className="field mt-2"
-            >
-              <option value="">All pack sizes</option>
-              {options?.products.flatMap((p) =>
-                p.variants.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {p.name} · {v.packSize}
-                  </option>
-                )),
-              )}
-            </select>
-          </label>
-        </>
-      )}
-      {["payments", "expenses"].includes(kind) && (
-        <label className="text-sm">
-          Payment method
-          <select
-            aria-label="Payment method"
-            name="method"
-            className="field mt-2"
-          >
-            <option value="">All methods</option>
-            {(kind === "payments"
-              ? ["UPI", "BANK"]
-              : ["UPI", "BANK", "CASH", "OTHER"]
-            ).map((m) => (
-              <option key={m}>{m}</option>
-            ))}
-          </select>
-        </label>
-      )}
-      {kind === "payments" && (
-        <>
-          <label className="text-sm">
-            Current payment status
-            <select
-              aria-label="Current payment status"
-              name="paymentStatus"
-              className="field mt-2"
-            >
-              <option value="">All payment statuses</option>
-              {["UNPAID", "PARTIALLY_PAID", "PAID", "OVERPAID"].map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm">
-            Proof review status
-            <select
-              aria-label="Proof review status"
-              name="reviewStatus"
-              className="field mt-2"
-            >
-              <option value="">All proof statuses</option>
-              {[
-                "SUBMITTED",
-                "UNDER_REVIEW",
-                "VERIFIED",
-                "REJECTED",
-                "RESUBMISSION_REQUIRED",
-              ].map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-          </label>
-        </>
-      )}
-      {kind === "expenses" && (
-        <label className="text-sm">
-          Expense category
-          <select
-            aria-label="Expense category"
-            name="category"
-            className="field mt-2"
-          >
-            <option value="">All expense categories</option>
-            {expenseCategories.map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-          </select>
-        </label>
-      )}
-      {["sales", "purchases", "expenses", "deliveries"].includes(kind) && (
-        <Input
-          name="status"
-          label={
-            kind === "deliveries"
-              ? "Delivery status (e.g. DELIVERED)"
-              : "Current status (optional)"
-          }
-        />
-      )}
-      {kind === "deliveries" && (
-        <>
-          <label className="text-sm">
-            Delivery method
-            <select
-              aria-label="Delivery method"
-              name="deliveryMethod"
-              className="field mt-2"
-            >
-              <option value="">All delivery methods</option>
-              <option value="LOCAL">Local delivery</option>
-              <option value="COURIER">Courier</option>
-            </select>
-          </label>
-          <Input name="courier" label="Courier company" />
-        </>
-      )}
-      {["profitability", "purchases", "suppliers"].includes(kind) && (
-        <label className="text-sm">
-          Trend grouping
-          <select
-            aria-label="Trend grouping"
-            name="period"
-            className="field mt-2"
-          >
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-          </select>
-        </label>
-      )}
-      {["inventory", "purchases", "suppliers", "customers", "dealers"].includes(
-        kind,
-      ) && (
-        <label className="text-sm">
-          Report view
-          <select aria-label="Report view" name="view" className="field mt-2">
-            <option value="summary">Summary records</option>
-            {kind === "inventory" ? (
-              <option value="movements">Movement history</option>
-            ) : kind === "purchases" || kind === "suppliers" ? (
-              <option value="receipts">Actual receiving</option>
-            ) : (
-              <option value="history">Purchase history</option>
+      <details
+        className="col-span-full border-t border-line pt-3"
+        onToggle={(event) => {
+          if (event.currentTarget.open) setAdvancedLoaded(true);
+        }}
+      >
+        <summary className="min-h-11 cursor-pointer py-2 font-semibold">
+          More report filters
+        </summary>
+        {advancedLoaded && (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mt-4 [&>label]:min-w-0 [&_select]:min-w-0">
+            <p className="col-span-full text-sm text-muted">
+              Selections remain active when this section is closed. Choose the
+              All option or clear a field to remove its filter.
+            </p>
+            {operational && (
+              <>
+                <label className="text-sm">
+                  Customer
+                  <select
+                    aria-label="Customer"
+                    name="customerId"
+                    className="field mt-2"
+                  >
+                    <option value="">All customers</option>
+                    {options?.customers.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.user.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-sm">
+                  Dealer
+                  <select
+                    aria-label="Dealer"
+                    name="dealerId"
+                    className="field mt-2"
+                  >
+                    <option value="">All dealers</option>
+                    {options?.customers
+                      .filter((c) => c.dealer)
+                      .map((c) => (
+                        <option key={c.dealer!.id} value={c.dealer!.id}>
+                          {c.dealer!.businessName}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <label className="text-sm">
+                  Customer category
+                  <select
+                    aria-label="Customer category"
+                    name="customerCategory"
+                    className="field mt-2"
+                  >
+                    <option value="">Retail and dealer</option>
+                    <option value="RETAIL">Retail</option>
+                    <option value="APPROVED_DEALER">
+                      Approved dealer sales
+                    </option>
+                  </select>
+                </label>
+              </>
             )}
-          </select>
-        </label>
-      )}
+            {["purchases", "suppliers"].includes(kind) && (
+              <label className="text-sm">
+                Supplier
+                <select
+                  aria-label="Supplier"
+                  name="supplierId"
+                  className="field mt-2"
+                >
+                  <option value="">All suppliers</option>
+                  {options?.suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {[
+              "sales",
+              "products",
+              "inventory",
+              "profitability",
+              "purchases",
+            ].includes(kind) && (
+              <>
+                <label className="text-sm">
+                  Product
+                  <select
+                    aria-label="Product"
+                    name="productId"
+                    className="field mt-2"
+                  >
+                    <option value="">All products</option>
+                    {options?.products.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-sm">
+                  Variant
+                  <select
+                    aria-label="Variant"
+                    name="variantId"
+                    className="field mt-2"
+                  >
+                    <option value="">All pack sizes</option>
+                    {options?.products.flatMap((p) =>
+                      p.variants.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {p.name} · {v.packSize}
+                        </option>
+                      )),
+                    )}
+                  </select>
+                </label>
+              </>
+            )}
+            {["payments", "expenses"].includes(kind) && (
+              <label className="text-sm">
+                Payment method
+                <select
+                  aria-label="Payment method"
+                  name="method"
+                  className="field mt-2"
+                >
+                  <option value="">All methods</option>
+                  {(kind === "payments"
+                    ? ["UPI", "BANK"]
+                    : ["UPI", "BANK", "CASH", "OTHER"]
+                  ).map((m) => (
+                    <option key={m}>{m}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {kind === "payments" && (
+              <>
+                <label className="text-sm">
+                  Current payment status
+                  <select
+                    aria-label="Current payment status"
+                    name="paymentStatus"
+                    className="field mt-2"
+                  >
+                    <option value="">All payment statuses</option>
+                    {["UNPAID", "PARTIALLY_PAID", "PAID", "OVERPAID"].map(
+                      (s) => (
+                        <option key={s}>{s}</option>
+                      ),
+                    )}
+                  </select>
+                </label>
+                <label className="text-sm">
+                  Proof review status
+                  <select
+                    aria-label="Proof review status"
+                    name="reviewStatus"
+                    className="field mt-2"
+                  >
+                    <option value="">All proof statuses</option>
+                    {[
+                      "SUBMITTED",
+                      "UNDER_REVIEW",
+                      "VERIFIED",
+                      "REJECTED",
+                      "RESUBMISSION_REQUIRED",
+                    ].map((s) => (
+                      <option key={s}>{s}</option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            )}
+            {kind === "expenses" && (
+              <label className="text-sm">
+                Expense category
+                <select
+                  aria-label="Expense category"
+                  name="category"
+                  className="field mt-2"
+                >
+                  <option value="">All expense categories</option>
+                  {expenseCategories.map((c) => (
+                    <option key={c}>{c}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {["sales", "purchases", "expenses", "deliveries"].includes(
+              kind,
+            ) && (
+              <Input
+                name="status"
+                label={
+                  kind === "deliveries"
+                    ? "Delivery status (e.g. DELIVERED)"
+                    : "Current status (optional)"
+                }
+              />
+            )}
+            {kind === "deliveries" && (
+              <>
+                <label className="text-sm">
+                  Delivery method
+                  <select
+                    aria-label="Delivery method"
+                    name="deliveryMethod"
+                    className="field mt-2"
+                  >
+                    <option value="">All delivery methods</option>
+                    <option value="LOCAL">Local delivery</option>
+                    <option value="COURIER">Courier</option>
+                  </select>
+                </label>
+                <Input name="courier" label="Courier company" />
+              </>
+            )}
+            {["profitability", "purchases", "suppliers"].includes(kind) && (
+              <label className="text-sm">
+                Trend grouping
+                <select
+                  aria-label="Trend grouping"
+                  name="period"
+                  className="field mt-2"
+                >
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </label>
+            )}
+            {[
+              "inventory",
+              "purchases",
+              "suppliers",
+              "customers",
+              "dealers",
+            ].includes(kind) && (
+              <label className="text-sm">
+                Report view
+                <select
+                  aria-label="Report view"
+                  name="view"
+                  className="field mt-2"
+                >
+                  <option value="summary">Summary records</option>
+                  {kind === "inventory" ? (
+                    <option value="movements">Movement history</option>
+                  ) : kind === "purchases" || kind === "suppliers" ? (
+                    <option value="receipts">Actual receiving</option>
+                  ) : (
+                    <option value="history">Purchase history</option>
+                  )}
+                </select>
+              </label>
+            )}
+          </div>
+        )}
+      </details>
       <button className="button self-end" type="submit">
         Apply report filters
       </button>

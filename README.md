@@ -23,7 +23,7 @@ npm run dev
 
 Open http://127.0.0.1:3000 (use this exact hostname so cookies and origin checks agree). Register your own local account. There are no seeded credentials.
 
-`setup:local` creates a PostgreSQL cluster under `.local/postgres`, listening only on 127.0.0.1:55432. It generates a random database password, separate auth secrets and private `.env` / `.env.test` files. It creates only `fixup_dev` and `fixup_test`, preserves existing environment files, and does not reuse a system PostgreSQL server. The database role is a local bootstrap superuser: do not use it for production.
+`setup:local` creates a PostgreSQL cluster under `.local/postgres`, listening only on 127.0.0.1:55433. It generates a random database password, separate auth secrets and private `.env` / `.env.test` files. It creates only `fixup_dev` and `fixup_test`, preserves existing environment files, and does not reuse a system PostgreSQL server. The database role is a local bootstrap superuser: do not use it for production.
 
 After restarting your machine:
 
@@ -125,7 +125,7 @@ See [architecture](docs/architecture.md), [API contracts](docs/api.md), [operati
 
 See [Phase 2 independent audit](docs/phase-2-final-audit.md), [Phase 3 API and frontend contracts](docs/phase-3-api.md) and [Phase 3 verification report](docs/phase-3-report.md). Customer profile, delivery addresses, dealer application and the future order-history page are linked from `/account`. Authorized administrators manage customers, dealer review and shared price lists from `/admin`; the owner also manages products and variants. Account pricing appears on product details after signing in. No individual dealer price overrides, checkout, orders, stock transactions or deployment are included.
 
-`npm run dev` regenerates Prisma automatically before startup. After schema/migration changes, run `npm run db:migrate` and restart the dev server to replace its cached client. QWIK setup is repeatable and preserves existing administrator edits; it never invents prices/SKUs or confirms the image-derived MRP.
+`npm run dev` regenerates Prisma automatically before startup. After schema/migration changes, run `npm run db:migrate` and restart the dev server to replace its cached client. Client generation does not apply database migrations. If login or registration returns HTTP 500 with Prisma `P2022` (for example, missing `User.twoFactorEnabled`), check `npm run db:status`, back up the configured database, apply the committed migrations with `npm run db:migrate`, and restart `npm run dev`. Verify that the connection targets your intended local database before running these commands; never reset the database to resolve a missing column. QWIK setup is repeatable and preserves existing administrator edits; it never invents prices/SKUs or confirms the image-derived MRP.
 
 ## Phase 4 purchasing and inventory
 

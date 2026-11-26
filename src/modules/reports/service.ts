@@ -14,8 +14,8 @@ import {
   rupees,
 } from "./math";
 import { csv } from "@/modules/inventory/schemas";
-import { eligibility as dispatchEligibility } from "@/modules/dispatch/service";
-import { load as loadSalesOrder } from "@/modules/sales/orders";
+import { assessEligibility } from "@/modules/dispatch/service";
+import { orderInclude } from "@/modules/sales/orders";
 type Tx = Prisma.TransactionClient;
 type Query = ReturnType<typeof reportQuery.parse>;
 type Range = ReturnType<typeof resolveRange>;
@@ -700,12 +700,40 @@ async function sources(
         "REPORT_LIMIT",
         "More than 1,000 ready-order eligibility checks match. Narrow the creation-date or customer filters.",
       );
+    // All inputs are read afresh in this report's RepeatableRead transaction.
+    // Reuse the same predicate as confirmation, without a per-order query waterfall.
+    const ids = candidates.map((o) => o.id);
+    const [currentOrders, drafts, customers] = candidates.length
+      ? await Promise.all([
+          tx.salesOrder.findMany({
+            where: { id: { in: ids } },
+            include: orderInclude,
+          }),
+          tx.dispatch.findMany({
+            where: { orderId: { in: ids } },
+            select: {
+              id: true,
+              orderId: true,
+              status: true,
+              method: true,
+              courierName: true,
+            },
+          }),
+          tx.customer.findMany({
+            where: { id: { in: candidates.map((o) => o.customerId) } },
+            include: {
+              user: { select: { active: true, role: true } },
+              dealer: { select: { status: true } },
+            },
+          }),
+        ])
+      : [[], [], []];
+    const orderById = new Map(currentOrders.map((o) => [o.id, o]));
+    const draftByOrder = new Map(drafts.map((d) => [d.orderId, d]));
+    const customerById = new Map(customers.map((c) => [c.id, c]));
     for (const o of candidates) {
+      const draft = draftByOrder.get(o.id) ?? null;
       if (q.deliveryMethod || q.courier) {
-        const draft = await tx.dispatch.findUnique({
-          where: { orderId: o.id },
-          select: { method: true, courierName: true },
-        });
         if (
           !draft ||
           (q.deliveryMethod && draft.method !== q.deliveryMethod) ||
@@ -714,8 +742,15 @@ async function sources(
         )
           continue;
       }
+      const current = orderById.get(o.id);
+      if (!current)
+        throw new AppError(404, "NOT_FOUND", "Order or payment not found.");
       if (
-        (await dispatchEligibility(tx, await loadSalesOrder(tx, o.id))).eligible
+        assessEligibility(
+          current,
+          draft,
+          customerById.get(current.customerId) ?? null,
+        ).eligible
       )
         readyCount++;
     }
@@ -1314,20 +1349,29 @@ function build(
   if (kind === "inventory") {
     let missing = 0;
     const known: number[] = [];
+    const movesByVariant = new Map<string, typeof s.movements>();
+    for (const movement of s.movements) {
+      const group = movesByVariant.get(movement.variantId) ?? [];
+      group.push(movement);
+      movesByVariant.set(movement.variantId, group);
+    }
+    const reservationByVariant = new Map(
+      s.reservations.map((r) => [r.variantId, r]),
+    );
+    const lotById = new Map(s.lots.map((l) => [l.id, l]));
+    const variantById = new Map(s.variants.map((v) => [v.id, v]));
     for (const v of s.variants) {
-      const moves = s.movements.filter((m) => m.variantId === v.id);
+      const moves = movesByVariant.get(v.id) ?? [];
       const onHand = sum(moves.map((m) => m._sum.availableDelta ?? 0)),
         damaged = sum(moves.map((m) => m._sum.damagedDelta ?? 0)),
-        reserved =
-          s.reservations.find((e) => e.variantId === v.id)?._sum
-            .quantityDelta ?? 0;
+        reserved = reservationByVariant.get(v.id)?._sum.quantityDelta ?? 0;
       let unknown = 0;
       const values: number[] = [];
       if (financial)
         for (const m of moves) {
           const qty = m._sum.availableDelta ?? 0;
           if (qty <= 0) continue;
-          const cost = s.lots.find((l) => l.id === m.lotId)?.cost;
+          const cost = lotById.get(m.lotId)?.cost;
           if (!cost) unknown += qty;
           else
             values.push(
@@ -1450,7 +1494,7 @@ function build(
     const movementRows: Row[] = s.recentMovements.map((m) => ({
       "Movement ID": m.id,
       "Variant ID": m.variantId,
-      Variant: s.variants.find((v) => v.id === m.variantId)?.name ?? "",
+      Variant: variantById.get(m.variantId)?.name ?? "",
       "Posting date": m.createdAt.toISOString(),
       Kind: m.kind,
       "Usable quantity delta": m.availableDelta,

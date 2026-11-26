@@ -5,6 +5,8 @@ import { accountDetail } from "@/modules/management/accounts";
 import { ManagedForm } from "@/components/forms/managed-form";
 import { reasonField } from "@/components/management/fields";
 import { AppError } from "@/server/http/errors";
+import { StatusBadge } from "@/components/orders/ui";
+import { titleCase } from "@/components/orders/status";
 export default async function Page({
   params,
 }: {
@@ -88,6 +90,20 @@ export default async function Page({
           <h2 className="text-xl font-semibold">
             Business application · {dealer.status}
           </h2>
+          <div className="mt-3">
+            <StatusBadge
+              label={titleCase(dealer.status)}
+              tone={
+                dealer.status === "APPROVED"
+                  ? "green"
+                  : dealer.status === "PENDING"
+                    ? "amber"
+                    : dealer.status === "SUSPENDED"
+                      ? "gray"
+                      : "red"
+              }
+            />
+          </div>
           <dl className="my-6 grid gap-4 sm:grid-cols-2">
             {Object.entries({
               "Contact person": dealer.contactName,

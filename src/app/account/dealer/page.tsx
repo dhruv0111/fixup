@@ -21,8 +21,10 @@ export default async function Page() {
           )}
           <p className="mt-3 text-muted">
             {dealer.status === "APPROVED"
-              ? "Your shared dealer prices are available on product pages while your account remains active."
-              : "Dealer access and dealer pricing require an approved, active account."}
+              ? "Your dealer prices are available on product pages while your approved account remains active. Check your prices there, add the pack sizes you need, then adjust quantities in your cart."
+              : dealer.status === "PENDING"
+                ? "Your application has been received and is waiting for FIXUP review. Check this page for the decision and any review note. Until approval, your account uses retail prices."
+                : "Dealer access and dealer pricing require an approved, active account. Check the review note or contact FIXUP about your application."}
           </p>
           <Link href="/products" className="text-link">
             Browse products

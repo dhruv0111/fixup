@@ -311,6 +311,13 @@ test("admin creates and edits shared variant prices; account sees only assigned 
     await page.context().addCookies((await owner.api.storageState()).cookies);
     await page.goto("/admin/price-lists/new");
     await page
+      .getByLabel("Find product or variant", { exact: true })
+      .fill(product.name);
+    await page.getByRole("button", { name: "Find items", exact: true }).click();
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get("q"))
+      .toBe(product.name);
+    await page
       .getByLabel("Price list name")
       .fill(`QA Browser Prices ${info.project.name} ${Date.now()}`);
     await page.getByLabel("Active price list").check();
@@ -340,6 +347,13 @@ test("admin creates and edits shared variant prices; account sees only assigned 
           (await db.priceList.findUniqueOrThrow({ where: { id } })).version,
       )
       .toBe(1);
+    await page.goto(`/admin/price-lists/${id}?q=NO-MATCH-UX-${Date.now()}`);
+    await expect(
+      page.getByLabel("Price target 1", { exact: true }),
+    ).toHaveValue(`v:${variant.id}`);
+    await expect(
+      page.getByLabel("Price amount 1", { exact: true }),
+    ).toHaveValue("125.5");
     await page.goto("/admin/price-lists");
     const retail = page.locator("section").filter({
       has: page.getByRole("heading", { name: "RETAIL", exact: true }),
@@ -352,6 +366,15 @@ test("admin creates and edits shared variant prices; account sees only assigned 
     await expect(retail.getByRole("status")).toContainText(
       "Saved successfully",
     );
+    await page.goto(`/admin/price-lists?q=NO-MATCH-UX-${Date.now()}`);
+    await expect(
+      page
+        .locator("section")
+        .filter({
+          has: page.getByRole("heading", { name: "RETAIL", exact: true }),
+        })
+        .getByLabel("Assigned price list"),
+    ).toHaveValue(id);
     await capture(page, info, "admin-price-lists");
     await page.context().clearCookies();
     await page.context().addCookies((await a.api.storageState()).cookies);
@@ -448,6 +471,8 @@ test("owner edits variant SKU, confirmed MRP, publication and parent content", a
     await expect(card).toContainText(`SKU: QA-BROWSER-${info.project.name}`);
     await expect(card).toContainText("MRP: ₹175.00");
     await page.goto(`/admin/products/${product.id}`);
+    // Forms submit natively if clicked before hydration finishes.
+    await page.waitForLoadState("networkidle");
     const parent = page.locator("section").filter({
       has: page.getByRole("heading", { name: "Parent product", exact: true }),
     });

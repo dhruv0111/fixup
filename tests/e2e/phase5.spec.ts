@@ -63,7 +63,12 @@ test("retail buyer completes cart, reviewed checkout, private proof and admin ba
     page.getByRole("heading", { name: /QA QWIK stock/ }),
   ).toBeVisible();
   await page.getByLabel("Quantity 8g", { exact: true }).fill("2");
-  await expect(page.getByRole("status")).toContainText("Cart updated.");
+  await page
+    .getByRole("button", { name: "Update quantity", exact: true })
+    .click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Cart updated." }),
+  ).toBeVisible();
   await capture(page, info, "cart");
   await page
     .getByRole("link", { name: "Review checkout", exact: true })

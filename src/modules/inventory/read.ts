@@ -152,12 +152,14 @@ export async function stockRows(actor: Actor, input: unknown = {}) {
         },
         _sum: { quantityDelta: true },
       });
+      const sumByVariant = new Map(sums.map((s) => [s.variantId, s]));
+      const reservationByVariant = new Map(
+        reservations.map((r) => [r.variantId, r]),
+      );
       const rows = variants.map((v) => {
-        const s = sums.find((s) => s.variantId === v.id);
+        const s = sumByVariant.get(v.id);
         const onHand = s?._sum.availableDelta ?? 0,
-          reserved =
-            reservations.find((r) => r.variantId === v.id)?._sum
-              .quantityDelta ?? 0,
+          reserved = reservationByVariant.get(v.id)?._sum.quantityDelta ?? 0,
           available = onHand - reserved,
           damaged = s?._sum.damagedDelta ?? 0,
           minimum = v.stockSetting?.minimumQuantity ?? null;
@@ -192,12 +194,27 @@ export async function stockRows(actor: Actor, input: unknown = {}) {
     { isolationLevel: "RepeatableRead" },
   );
 }
-export async function options(actor: Actor) {
+export async function options(
+  actor: Actor,
+  supplierSearch = "",
+  selectedSupplierId?: string,
+) {
   allowed(actor, "inventory.read");
+  if (supplierSearch.length > 100)
+    throw new AppError(
+      400,
+      "INVALID_SEARCH",
+      "Use at most 100 search characters.",
+    );
   const db = getDb();
   const [suppliers, variants, lots] = await Promise.all([
     db.supplier.findMany({
-      where: { status: "ACTIVE" },
+      where: {
+        status: "ACTIVE",
+        ...(supplierSearch
+          ? { name: { contains: supplierSearch, mode: "insensitive" as const } }
+          : {}),
+      },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
       take: 1000,
@@ -216,8 +233,17 @@ export async function options(actor: Actor) {
       take: 1000,
     }),
   ]);
+  const selectedSupplier = selectedSupplierId
+    ? await db.supplier.findUnique({
+        where: { id: selectedSupplierId },
+        select: { id: true, name: true },
+      })
+    : null;
   return {
-    suppliers,
+    suppliers:
+      selectedSupplier && !suppliers.some((s) => s.id === selectedSupplier.id)
+        ? [selectedSupplier, ...suppliers]
+        : suppliers,
     variants: variants.map((v) => ({
       id: v.id,
       name: `${v.product.name} / ${v.name} (${v.packSize})`,

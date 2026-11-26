@@ -48,6 +48,26 @@ test("local date boundaries handle India and a DST transition", () => {
     "2026-11-14",
   );
 });
+test("reused date formatters preserve timezone boundaries without caching date values", () => {
+  for (const zone of ["Asia/Kolkata", "America/New_York", "UTC"]) {
+    for (const timestamp of [
+      "2026-03-08T06:59:59Z",
+      "2026-03-08T07:00:00Z",
+      "2026-11-13T18:29:59Z",
+      "2026-11-13T18:30:00Z",
+    ]) {
+      const date = new Date(timestamp);
+      const expected = new Intl.DateTimeFormat("en-CA", {
+        timeZone: zone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(date);
+      assert.equal(dayInZone(date, zone), expected);
+    }
+  }
+  assert.throws(() => dayInZone(new Date(), "Invalid/Timezone"), RangeError);
+});
 test("weekly/monthly buckets use local calendar date and Monday weeks", () => {
   assert.equal(
     bucket(new Date("2026-11-15T20:00:00Z"), "Asia/Kolkata", "weekly"),

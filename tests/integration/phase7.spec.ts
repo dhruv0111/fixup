@@ -40,6 +40,21 @@ import {
 } from "../fixtures/phase4";
 import { createHash } from "node:crypto";
 let owner: Awaited<ReturnType<typeof staff>>;
+test("batched dashboard eligibility still rejects a suspended paid customer's ready order", async () => {
+  const s = await scenario(owner.api);
+  const path = `${reports}/dashboard?preset=month&q=${encodeURIComponent(s.o.row.number)}`;
+  const ready = async () => {
+    const response = await owner.api.get(path);
+    expect(response.status(), await response.text()).toBe(200);
+    return (await response.json()).data.cards.find(
+      (card: { key: string }) => card.key === "ready",
+    ).value;
+  };
+  expect(await ready()).toBe(1);
+  await db.user.update({ where: { id: s.b.user.id }, data: { active: false } });
+  expect(await ready()).toBe(0);
+  await s.b.api.dispose();
+});
 test("database rejects expense changes without history and ghost financial revisions", async () => {
   const x = await expense(owner.api);
   const original = await db.expenseRevision.findFirstOrThrow({

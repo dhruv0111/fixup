@@ -1,4 +1,5 @@
-import Link from "next/link";
+import { PaginatedTable } from "./paginated-table";
+import { OperationsTabs } from "./operations-tabs";
 export const operationLinks = [
   ["Suppliers", "suppliers"],
   ["Purchase Orders", "purchase-orders"],
@@ -9,19 +10,7 @@ export const operationLinks = [
   ["Inventory Reports", "reports"],
 ] as const;
 export function OperationsNav() {
-  return (
-    <nav aria-label="Purchasing and inventory" className="flex flex-wrap gap-3">
-      {operationLinks.map(([label, path]) => (
-        <Link
-          className="button button-secondary compact"
-          key={path}
-          href={`/admin/operations/${path}`}
-        >
-          {label}
-        </Link>
-      ))}
-    </nav>
-  );
+  return <OperationsTabs links={operationLinks} />;
 }
 export const money = (v: number) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(
@@ -59,42 +48,21 @@ export function DataTable({ rows }: { rows: Record<string, unknown>[] }) {
     )
     .sort((a, b) => rank(a) - rank(b));
   return (
-    <div
-      className="max-w-full overflow-x-auto rounded-xl border border-line"
-      tabIndex={0}
-      role="region"
-      aria-label="Report data"
-    >
-      <table className="w-full border-collapse text-left text-sm">
-        <thead className="bg-violet-50">
-          <tr>
-            {keys.map((k) => (
-              <th key={k} className="whitespace-nowrap p-3 font-semibold">
-                {k.replace(/([A-Z])/g, " $1")}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={i} className="border-t border-line">
-              {keys.map((k) => (
-                <td key={k} className="max-w-xs break-words p-3">
-                  {r[k] === null || r[k] === undefined
-                    ? "Not supplied"
-                    : k.endsWith("Paise") && typeof r[k] === "number"
-                      ? money(r[k] as number)
-                      : typeof r[k] === "boolean"
-                        ? r[k]
-                          ? "Yes"
-                          : "No"
-                        : String(r[k])}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <PaginatedTable
+      columns={keys.map((k) => k.replace(/([A-Z])/g, " $1"))}
+      rows={rows.map((row) =>
+        keys.map((k) =>
+          row[k] === null || row[k] === undefined
+            ? "Not supplied"
+            : k.endsWith("Paise") && typeof row[k] === "number"
+              ? money(row[k] as number)
+              : typeof row[k] === "boolean"
+                ? row[k]
+                  ? "Yes"
+                  : "No"
+                : String(row[k]),
+        ),
+      )}
+    />
   );
 }

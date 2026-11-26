@@ -103,7 +103,7 @@ export default async function HomePage() {
             <h3 className="mb-4 font-semibold">Explore by category</h3>
             {categories.length ? (
               <div className="flex flex-wrap gap-3">
-                {categories.map((c) => (
+                {categories.slice(0, 8).map((c) => (
                   <Link
                     className="category-chip"
                     key={c.slug}
@@ -118,6 +118,11 @@ export default async function HomePage() {
               <p className="text-sm text-muted">
                 Product categories will appear as the catalogue is approved.
               </p>
+            )}
+            {categories.length > 8 && (
+              <Link className="text-link mt-4 inline-flex" href="/products">
+                View all categories in the catalogue →
+              </Link>
             )}
           </div>
         </div>

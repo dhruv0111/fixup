@@ -47,6 +47,7 @@ export function ManagedForm({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [failed, setFailed] = useState(false);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy) return;
@@ -82,6 +83,7 @@ export function ManagedForm({
     }
     setBusy(true);
     setMessage("");
+    setFailed(false);
     try {
       const response = await fetch(url, {
         method,
@@ -89,6 +91,7 @@ export function ManagedForm({
         body: JSON.stringify(body),
       });
       const result = await response.json();
+      setFailed(!response.ok);
       setMessage(
         response.ok
           ? "Saved successfully."
@@ -105,13 +108,18 @@ export function ManagedForm({
         router.refresh();
       }
     } catch {
+      setFailed(true);
       setMessage("Unable to save. Check your connection and try again.");
     } finally {
       setBusy(false);
     }
   }
   return (
-    <form onSubmit={submit} className="management-form space-y-5">
+    <form
+      onSubmit={submit}
+      className="management-form space-y-5"
+      aria-busy={busy}
+    >
       <fieldset disabled={busy} className="grid min-w-0 gap-5 sm:grid-cols-2">
         {fields.map((field) => {
           const fieldId = `${id}-${field.name}`;
@@ -141,6 +149,7 @@ export function ManagedForm({
               {field.type === "textarea" ? (
                 <textarea
                   id={fieldId}
+                  aria-describedby={field.hint ? `${fieldId}-hint` : undefined}
                   name={field.name}
                   required={field.required}
                   defaultValue={String(value ?? "")}
@@ -150,6 +159,7 @@ export function ManagedForm({
               ) : field.type === "multi-select" ? (
                 <select
                   id={fieldId}
+                  aria-describedby={field.hint ? `${fieldId}-hint` : undefined}
                   name={field.name}
                   multiple
                   defaultValue={Array.isArray(value) ? value.map(String) : []}
@@ -164,6 +174,7 @@ export function ManagedForm({
               ) : field.type === "select" ? (
                 <select
                   id={fieldId}
+                  aria-describedby={field.hint ? `${fieldId}-hint` : undefined}
                   name={field.name}
                   defaultValue={String(value ?? "")}
                   required={field.required}
@@ -177,6 +188,7 @@ export function ManagedForm({
               ) : field.type === "checkbox" ? (
                 <input
                   id={fieldId}
+                  aria-describedby={field.hint ? `${fieldId}-hint` : undefined}
                   name={field.name}
                   type="checkbox"
                   required={field.required}
@@ -185,6 +197,7 @@ export function ManagedForm({
               ) : (
                 <input
                   id={fieldId}
+                  aria-describedby={field.hint ? `${fieldId}-hint` : undefined}
                   name={field.name}
                   type={
                     field.type === "money" ? "number" : (field.type ?? "text")
@@ -212,7 +225,9 @@ export function ManagedForm({
                 />
               )}
               {field.hint && (
-                <p className="mt-1 text-xs text-muted">{field.hint}</p>
+                <p id={`${fieldId}-hint`} className="mt-1 text-xs text-muted">
+                  {field.hint}
+                </p>
               )}
             </div>
           );
@@ -221,7 +236,7 @@ export function ManagedForm({
       <button disabled={busy} className="button" type="submit">
         {busy ? "Saving…" : submitLabel}
       </button>
-      <p role="status" className="text-sm break-words">
+      <p role={failed ? "alert" : "status"} className="text-sm break-words">
         {message}
       </p>
     </form>
